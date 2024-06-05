@@ -290,13 +290,11 @@ def align_rasters(
 
 
 class BaseFileUtils:
-    """
-    Provides functionality for commonly used file-related operations.
-    """
+    """Provides functionality for commonly used file-related operations."""
 
     @staticmethod
     def create_new_dir(directory: str, log_message: str = ""):
-        """Creates new file directory if it doesn't exist"""
+        """Creates new file directory if it doesn't exist."""
         p = Path(directory)
         if not p.exists():
             try:
@@ -306,7 +304,7 @@ class BaseFileUtils:
 
     @staticmethod
     def create_new_file(file_path: str, log_message: str = ""):
-        """Creates new file"""
+        """Creates new file."""
         p = Path(file_path)
 
         if not p.exists():
@@ -418,9 +416,7 @@ def align_rasters(
 
 
 def get_layer_type(file_path: str):
-    """
-    Get layer type code from file path
-    """
+    """Get layer type code from file path."""
     file_name, file_extension = os.path.splitext(file_path)
     if file_extension.lower() in [".tif", ".tiff"]:
         return 0
@@ -431,11 +427,16 @@ def get_layer_type(file_path: str):
 
 
 class CustomJsonEncoder(json.JSONEncoder):
-    """
-    Custom JSON encoder which handles UUID and datetime
-    """
+    """Custom JSON encoder which handles UUID and datetime."""
 
     def default(self, obj):
+        """Return value based on object type.
+
+        :param obj: Object to be encoded
+        :type obj: Any
+        :return: Encoded value
+        :rtype: Any
+        """
         if isinstance(obj, UUID):
             # if the obj is uuid, we simply return the value of uuid
             return obj.hex
@@ -446,9 +447,7 @@ class CustomJsonEncoder(json.JSONEncoder):
 
 
 def todict(obj, classkey=None):
-    """
-    Convert any object to dictionary
-    """
+    """Convert any object to dictionary."""
 
     if isinstance(obj, dict):
         data = {}
