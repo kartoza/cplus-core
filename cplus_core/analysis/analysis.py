@@ -7,6 +7,7 @@ import datetime
 import os
 import uuid
 from pathlib import Path
+import typing
 
 import math
 from qgis import processing
@@ -28,7 +29,7 @@ from ..utils.conf import settings_manager, Settings
 from ..definitions.defaults import (
     SCENARIO_OUTPUT_FILE_NAME,
 )
-from ..models.base import ScenarioResult
+from ..models.base import ScenarioResult, Activity
 from ..models.helpers import clone_activity
 from ..utils.helper import align_rasters, clean_filename, tr, log, BaseFileUtils
 
@@ -77,25 +78,73 @@ class ScenarioAnalysisTask(QgsTask):
         self.scenario = scenario
 
     def get_settings_value(self, name: str, default=None, setting_type=None):
+        """Gets value of the setting with the passed name.
+
+        :param name: Name of setting key
+        :type name: str
+
+        :param default: Default value returned when the setting key does not exist
+        :type default: Any, optional
+
+        :param setting_type: Type of the store setting
+        :type setting_type: Any, optional
+
+        :return: Value of the setting
+        :rtype: Any
+        """
         return settings_manager.get_value(name, default, setting_type)
 
-    def get_scenario_directory(self):
+    def get_scenario_directory(self) -> str:
+        """Gets the scenario directory path.
+
+        :return: Path to the scenario directory
+        :rtype: str
+        """
         base_dir = self.get_settings_value(Settings.BASE_DIR)
         return os.path.join(
             f"{base_dir}",
             "scenario_" f'{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}',
         )
 
-    def get_priority_layer(self, identifier):
+    def get_priority_layer(self, identifier) -> typing.Dict:
+        """Retrieves the priority layer that matches the passed identifier.
+
+        :param identifier: Priority layers identifier
+        :type identifier: uuid.UUID
+
+        :returns: Priority layer dict
+        :rtype: dict
+        """
         return settings_manager.get_priority_layer(identifier)
 
-    def get_activity(self, activity_uuid):
+    def get_activity(self, activity_uuid) -> typing.Union[Activity, None]:
+        """Gets an activity object matching the given unique
+        identifier.
+
+        :param activity_uuid: Unique identifier of the
+        activity object.
+        :type activity_uuid: str
+
+        :returns: Returns the activity object matching the given
+        identifier else None if not found.
+        :rtype: Activity
+        """
         return settings_manager.get_activity(activity_uuid)
 
-    def get_priority_layers(self):
+    def get_priority_layers(self) -> typing.List:
+        """Gets all the available priority layers in the plugin.
+
+        :returns: Priority layers list
+        :rtype: list
+        """
         return settings_manager.get_priority_layers()
 
-    def get_masking_layers(self):
+    def get_masking_layers(self) -> typing.List:
+        """Gets all the masking layers in the plugin.
+
+        :return: List of masking layer path
+        :rtype: list
+        """
         masking_layers_paths = self.get_settings_value(
             Settings.MASK_LAYERS_PATHS, default=None
         )
@@ -105,6 +154,11 @@ class ScenarioAnalysisTask(QgsTask):
         return masking_layers
 
     def cancel_task(self, exception=None):
+        """Cancel the task.
+
+        :param exception: Exception when the task is stopped, defaults to None
+        :type exception: Exception, optional
+        """
         self.error = exception
         self.cancel()
 
@@ -115,6 +169,23 @@ class ScenarioAnalysisTask(QgsTask):
         info: bool = True,
         notify: bool = True,
     ):
+        """Logs the message into QGIS logs using qgis_cplus as the default
+        log instance.
+        If notify_user is True, user will be notified about the log.
+
+        :param message: The log message
+        :type message: str
+
+        :param name: Name of te log instance, qgis_cplus is the default
+        :type message: str
+
+        :param info: Whether the message is about info or a
+        warning
+        :type info: bool
+
+        :param notify: Whether to notify user about the log
+        :type notify: bool
+        """
         log(message, name=name, info=info, notify=notify)
 
     def on_terminated(self):
@@ -126,7 +197,7 @@ class ScenarioAnalysisTask(QgsTask):
         self.log_message(message)
 
     def run(self):
-        """Runs the main scenario analysis task operations"""
+        """Runs the main scenario analysis task operations."""
 
         self.scenario_directory = self.get_scenario_directory()
 
@@ -297,14 +368,31 @@ class ScenarioAnalysisTask(QgsTask):
             self.log_message(f"Error from task scenario task {self.error}")
 
     def set_status_message(self, message):
+        """Set status message in the progress dialog.
+
+        :param message: Status message
+        :type message: str
+        """
         self.status_message = message
         self.status_message_changed.emit(self.status_message)
 
     def set_info_message(self, message, level=Qgis.Info):
+        """Set info message in the plugin.
+
+        :param message: message to be displayed
+        :type message: str
+        :param level: severity level, defaults to Qgis.Info
+        :type level: int, optional
+        """
         self.info_message = message
         self.info_message_changed.emit(self.info_message, level)
 
     def set_custom_progress(self, value):
+        """Set custom progress of the task in the progress dialog.
+
+        :param value: Progress bar value
+        :type value: float
+        """
         self.custom_progress = value
         self.custom_progress_changed.emit(self.custom_progress)
 
