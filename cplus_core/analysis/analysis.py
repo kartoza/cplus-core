@@ -24,13 +24,19 @@ from qgis.core import (
     QgsTask,
 )
 
-from ..utils.conf import settings_manager, Settings
+from ..utils.conf import Settings
 from ..definitions.defaults import (
     SCENARIO_OUTPUT_FILE_NAME,
 )
 from ..models.base import ScenarioResult
 from ..models.helpers import clone_activity
-from ..utils.helper import align_rasters, clean_filename, tr, log, BaseFileUtils
+from ..utils.helper import (
+    align_rasters,
+    clean_filename,
+    tr,
+    BaseFileUtils
+)
+from .task_config import TaskConfig
 
 
 class ScenarioAnalysisTask(QgsTask):
@@ -40,23 +46,17 @@ class ScenarioAnalysisTask(QgsTask):
     info_message_changed = QtCore.pyqtSignal(str, int)
 
     custom_progress_changed = QtCore.pyqtSignal(float)
+    log_received = QtCore.pyqtSignal(str, str, bool, bool)
 
-    def __init__(
-        self,
-        analysis_scenario_name,
-        analysis_scenario_description,
-        analysis_activities,
-        analysis_priority_layers_groups,
-        analysis_extent,
-        scenario,
-    ):
+    def __init__(self, task_config: TaskConfig):
         super().__init__()
-        self.analysis_scenario_name = analysis_scenario_name
-        self.analysis_scenario_description = analysis_scenario_description
+        self.task_config = task_config
+        self.analysis_scenario_name = task_config.scenario_name
+        self.analysis_scenario_description = task_config.scenario_desc
 
-        self.analysis_activities = analysis_activities
-        self.analysis_priority_layers_groups = analysis_priority_layers_groups
-        self.analysis_extent = analysis_extent
+        self.analysis_activities = task_config.analysis_activities
+        self.analysis_priority_layers_groups = task_config.priority_layer_groups
+        self.analysis_extent = task_config.analysis_extent
         self.analysis_extent_string = None
 
         self.analysis_weighted_activities = []
@@ -74,10 +74,10 @@ class ScenarioAnalysisTask(QgsTask):
         self.feedback = QgsProcessingFeedback()
         self.processing_context = QgsProcessingContext()
 
-        self.scenario = scenario
+        self.scenario = task_config.scenario
 
     def get_settings_value(self, name: str, default=None, setting_type=None):
-        return settings_manager.get_value(name, default, setting_type)
+        return self.task_config.get_value(name, default, setting_type)
 
     def get_scenario_directory(self):
         base_dir = self.get_settings_value(Settings.BASE_DIR)
@@ -87,13 +87,13 @@ class ScenarioAnalysisTask(QgsTask):
         )
 
     def get_priority_layer(self, identifier):
-        return settings_manager.get_priority_layer(identifier)
+        return self.task_config.get_priority_layer(identifier)
 
     def get_activity(self, activity_uuid):
-        return settings_manager.get_activity(activity_uuid)
+        return self.task_config.get_activity(activity_uuid)
 
     def get_priority_layers(self):
-        return settings_manager.get_priority_layers()
+        return self.task_config.get_priority_layers()
 
     def get_masking_layers(self):
         masking_layers_paths = self.get_settings_value(
@@ -115,7 +115,7 @@ class ScenarioAnalysisTask(QgsTask):
         info: bool = True,
         notify: bool = True,
     ):
-        log(message, name=name, info=info, notify=notify)
+        self.log_received.emit(message, name, info, notify)
 
     def on_terminated(self):
         """Called when the task is terminated."""
@@ -431,7 +431,7 @@ class ScenarioAnalysisTask(QgsTask):
 
             return outputs is not None
         except Exception as e:
-            log(f"Problem replacing no data value from a snapping output, {e}")
+            self.log_message(f"Problem replacing no data value from a snapping output, {e}")
 
         return False
 
@@ -824,7 +824,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         """
 
-        input_result_path, reference_result_path = align_rasters(
+        input_result_path, logs = align_rasters(
             input_path,
             reference_path,
             extent,
@@ -832,6 +832,10 @@ class ScenarioAnalysisTask(QgsTask):
             rescale_values,
             resampling_method,
         )
+        for log in logs:
+            self.log_message(log, info=(
+                "Problem" not in log
+            ))
 
         if input_result_path is not None:
             result_path = Path(input_result_path)
