@@ -77,7 +77,7 @@ class ScenarioAnalysisTask(QgsTask):
         return self.task_config.get_value(name, default, setting_type)
 
     def get_scenario_directory(self):
-        base_dir = self.get_settings_value(Settings.BASE_DIR, "")
+        base_dir = self.get_settings_value(Settings.BASE_DIR, default="")
         return os.path.join(
             f"{base_dir}",
             "scenario_" f'{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}',
