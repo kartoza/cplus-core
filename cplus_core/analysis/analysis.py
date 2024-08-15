@@ -30,12 +30,7 @@ from ..definitions.defaults import (
 )
 from ..models.base import ScenarioResult
 from ..models.helpers import clone_activity
-from ..utils.helper import (
-    align_rasters,
-    clean_filename,
-    tr,
-    BaseFileUtils
-)
+from ..utils.helper import align_rasters, clean_filename, tr, BaseFileUtils
 from .task_config import TaskConfig
 
 
@@ -47,6 +42,7 @@ class ScenarioAnalysisTask(QgsTask):
 
     custom_progress_changed = QtCore.pyqtSignal(float)
     log_received = QtCore.pyqtSignal(str, str, bool, bool)
+    task_cancelled = QtCore.pyqtSignal(bool)
 
     def __init__(self, task_config: TaskConfig):
         super().__init__()
@@ -75,12 +71,13 @@ class ScenarioAnalysisTask(QgsTask):
         self.processing_context = QgsProcessingContext()
 
         self.scenario = task_config.scenario
+        self.scenario_directory = self.get_scenario_directory()
 
     def get_settings_value(self, name: str, default=None, setting_type=None):
         return self.task_config.get_value(name, default, setting_type)
 
     def get_scenario_directory(self):
-        base_dir = self.get_settings_value(Settings.BASE_DIR)
+        base_dir = self.get_settings_value(Settings.BASE_DIR, "")
         return os.path.join(
             f"{base_dir}",
             "scenario_" f'{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}',
@@ -106,7 +103,12 @@ class ScenarioAnalysisTask(QgsTask):
 
     def cancel_task(self, exception=None):
         self.error = exception
-        self.cancel()
+        try:
+            self.cancel()
+        except Exception:
+            pass
+        finally:
+            self.task_cancelled.emit(exception is not None)
 
     def log_message(
         self,
@@ -127,8 +129,6 @@ class ScenarioAnalysisTask(QgsTask):
 
     def run(self):
         """Runs the main scenario analysis task operations"""
-
-        self.scenario_directory = self.get_scenario_directory()
 
         BaseFileUtils.create_new_dir(self.scenario_directory)
 
@@ -431,7 +431,9 @@ class ScenarioAnalysisTask(QgsTask):
 
             return outputs is not None
         except Exception as e:
-            self.log_message(f"Problem replacing no data value from a snapping output, {e}")
+            self.log_message(
+                f"Problem replacing no data value from a snapping output, {e}"
+            )
 
         return False
 
@@ -833,9 +835,7 @@ class ScenarioAnalysisTask(QgsTask):
             resampling_method,
         )
         for log in logs:
-            self.log_message(log, info=(
-                "Problem" not in log
-            ))
+            self.log_message(log, info=("Problem" not in log))
 
         if input_result_path is not None:
             result_path = Path(input_result_path)
