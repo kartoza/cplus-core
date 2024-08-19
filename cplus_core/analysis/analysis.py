@@ -57,7 +57,6 @@ class ScenarioAnalysisTask(QgsTask):
 
         self.analysis_weighted_activities = []
         self.scenario_result = None
-        self.scenario_directory = None
 
         self.success = True
         self.output = None
@@ -71,17 +70,10 @@ class ScenarioAnalysisTask(QgsTask):
         self.processing_context = QgsProcessingContext()
 
         self.scenario = task_config.scenario
-        self.scenario_directory = self.get_scenario_directory()
+        self.scenario_directory = task_config.base_dir
 
     def get_settings_value(self, name: str, default=None, setting_type=None):
         return self.task_config.get_value(name, default)
-
-    def get_scenario_directory(self):
-        base_dir = self.get_settings_value(Settings.BASE_DIR, default="")
-        return os.path.join(
-            f"{base_dir}",
-            "scenario_" f'{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}',
-        )
 
     def get_priority_layer(self, identifier):
         return self.task_config.get_priority_layer(identifier)
