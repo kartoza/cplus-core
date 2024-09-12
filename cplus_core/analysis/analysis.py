@@ -1415,7 +1415,7 @@ class ScenarioAnalysisTask(QgsTask):
                 sieved_ims_directory = os.path.join(
                     self.scenario_directory, "sieved_ims"
                 )
-                FileUtils.create_new_dir(sieved_ims_directory)
+                BaseFileUtils.create_new_dir(sieved_ims_directory)
                 file_name = clean_filename(model.name.replace(" ", "_"))
 
                 output_file = os.path.join(
