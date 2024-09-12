@@ -46,8 +46,8 @@ class ScenarioAnalysisTask(QgsTask):
     def __init__(self, task_config: TaskConfig):
         super().__init__()
         self.task_config = task_config
-        self.analysis_scenario_name = task_config.scenario_name
-        self.analysis_scenario_description = task_config.scenario_desc
+        self.analysis_scenario_name = task_config.scenario.name
+        self.analysis_scenario_description = task_config.scenario.description
 
         self.analysis_activities = task_config.analysis_activities
         self.analysis_priority_layers_groups = task_config.priority_layer_groups
