@@ -1368,7 +1368,7 @@ class ScenarioAnalysisTask(QgsTask):
         threshold size (in pixels) and replaces them with the pixel value of
         the largest neighbour polygon.
 
-        :param models: List of the analyzed implementation models
+        :param models: List of the analyzed activities
         :type models: typing.List[ImplementationModel]
 
         :param extent: Selected area of interest extent
@@ -1385,9 +1385,7 @@ class ScenarioAnalysisTask(QgsTask):
             # Will not proceed if processing has been cancelled by the user
             return False
 
-        self.set_status_message(
-            tr("Applying sieve function to the implementation models")
-        )
+        self.set_status_message(tr("Applying sieve function to the activities"))
 
         try:
             for model in models:
@@ -1417,7 +1415,7 @@ class ScenarioAnalysisTask(QgsTask):
                 sieved_ims_directory = os.path.join(
                     self.scenario_directory, "sieved_ims"
                 )
-                BaseFileUtils.create_new_dir(sieved_ims_directory)
+                FileUtils.create_new_dir(sieved_ims_directory)
                 file_name = clean_filename(model.name.replace(" ", "_"))
 
                 output_file = os.path.join(
@@ -1437,12 +1435,14 @@ class ScenarioAnalysisTask(QgsTask):
                 )
 
                 # Actual processing calculation
-                # alg_params = {
-                #     "INPUT": model.path,
-                #     "THRESHOLD": threshold_value,
-                #     "MASK_LAYER": mask_layer,
-                #     "OUTPUT": output,
-                # }
+                alg_params = {
+                    "INPUT": model.path,
+                    "THRESHOLD": threshold_value,
+                    "MASK_LAYER": mask_layer,
+                    "OUTPUT": output,
+                }
+
+                self.log_message(f"Used parameters for sieving: {alg_params} \n")
 
                 input_name = os.path.splitext(os.path.basename(model.path))[0]
 
