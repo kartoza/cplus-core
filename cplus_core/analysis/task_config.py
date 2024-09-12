@@ -2,11 +2,10 @@
 """
     TaskConfig
 """
-import uuid
 import typing
 import enum
 
-from ..models.base import Scenario, Activity, SpatialExtent
+from ..models.base import Scenario, Activity
 from ..definitions.defaults import DEFAULT_VALUES
 from ..utils.conf import Settings
 
@@ -14,13 +13,13 @@ from ..utils.conf import Settings
 class TaskConfig(object):
     """Config class for Scenario Analysis."""
 
-    scenario_name = ""
-    scenario_desc = ""
-    scenario_uuid = uuid.uuid4()
-    analysis_activities: typing.List[Activity] = []
+    # scenario data
+    scenario: Scenario = None
     priority_layers: typing.List = []
     priority_layer_groups: typing.List = []
-    analysis_extent: SpatialExtent = None
+    analysis_activities: typing.List[Activity] = []
+
+    # config
     snapping_enabled: bool = DEFAULT_VALUES.snapping_enabled
     snap_layer = ""
     snap_rescale = DEFAULT_VALUES.snap_rescale
@@ -31,7 +30,7 @@ class TaskConfig(object):
     sieve_threshold = DEFAULT_VALUES.sieve_threshold
     mask_path = ""
     mask_layers_paths = ""
-    scenario: Scenario = None
+
     # output selections
     ncs_with_carbon = DEFAULT_VALUES.ncs_with_carbon
     landuse_project = DEFAULT_VALUES.landuse_project
@@ -42,13 +41,10 @@ class TaskConfig(object):
 
     def __init__(
         self,
-        scenario_name,
-        scenario_desc,
-        extent,
-        analysis_activities,
+        scenario,
         priority_layers,
         priority_layer_groups,
-        scenario_uuid=None,
+        analysis_activities,
         snapping_enabled=False,
         snap_rescale=DEFAULT_VALUES.snap_rescale,
         snap_method=DEFAULT_VALUES.snap_method,
@@ -63,14 +59,11 @@ class TaskConfig(object):
         highest_position=DEFAULT_VALUES.highest_position,
         base_dir="",
     ) -> None:
-        self.scenario_name = scenario_name
-        self.scenario_desc = scenario_desc
-        if scenario_uuid:
-            self.scenario_uuid = uuid.UUID(scenario_uuid)
-        self.analysis_extent = SpatialExtent(bbox=extent)
-        self.analysis_activities = analysis_activities
+        self.scenario = scenario
         self.priority_layers = priority_layers
         self.priority_layer_groups = priority_layer_groups
+        self.analysis_activities = analysis_activities
+
         self.snapping_enabled = snapping_enabled
         self.pathway_suitability_index = pathway_suitability_index
         self.carbon_coefficient = carbon_coefficient
@@ -78,21 +71,14 @@ class TaskConfig(object):
         self.snap_method = snap_method
         self.sieve_enabled = sieve_enabled
         self.sieve_threshold = sieve_threshold
-        self.scenario = Scenario(
-            uuid=self.scenario_uuid,
-            name=self.scenario_name,
-            description=self.scenario_desc,
-            extent=self.analysis_extent,
-            activities=self.analysis_activities,
-            weighted_activities=[],
-            priority_layer_groups=self.priority_layer_groups,
-        )
+
         # output selections
         self.ncs_with_carbon = ncs_with_carbon
         self.landuse_project = landuse_project
         self.landuse_normalized = landuse_normalized
         self.landuse_weighted = landuse_weighted
         self.highest_position = highest_position
+
         self.base_dir = base_dir
 
     def get_activity(self, activity_uuid: str) -> typing.Union[Activity, None]:
@@ -156,7 +142,7 @@ class TaskConfig(object):
         input_dict = {
             "scenario_name": self.scenario.name,
             "scenario_desc": self.scenario.description,
-            "extent": self.analysis_extent.bbox,
+            "extent": self.scenario.extent.bbox,
             "snapping_enabled": self.snapping_enabled,
             "snap_layer": self.snap_layer,
             "snap_rescale": self.snap_rescale,
@@ -177,7 +163,7 @@ class TaskConfig(object):
             "highest_position": self.highest_position,
             "base_dir": self.base_dir,
         }
-        for activity in self.analysis_activities:
+        for activity in self.scenario.activities:
             activity_dict = {
                 "uuid": str(activity.uuid),
                 "name": activity.name,

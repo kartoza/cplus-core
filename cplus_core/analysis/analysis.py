@@ -51,7 +51,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         self.analysis_activities = task_config.analysis_activities
         self.analysis_priority_layers_groups = task_config.priority_layer_groups
-        self.analysis_extent = task_config.analysis_extent
+        self.analysis_extent = task_config.scenario.extent
         self.analysis_extent_string = None
 
         self.analysis_weighted_activities = []
