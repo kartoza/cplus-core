@@ -3,7 +3,6 @@
  Plugin tasks related to the scenario analysis
 
 """
-import datetime
 import os
 import uuid
 from pathlib import Path
