@@ -72,18 +72,58 @@ class ScenarioAnalysisTask(QgsTask):
         self.scenario_directory = task_config.base_dir
 
     def get_settings_value(self, name: str, default=None, setting_type=None):
+        """Get attribute value by attribute name.
+
+        :param name: Attribute name/config key
+        :type name: Settings
+
+        :param default: Default value if not found, defaults to None
+        :type default: any, optional
+
+        :param setting_type: type of attribute, defaults to None
+        :type setting_type: any, optional
+
+        :return: Attribute value
+        :rtype: any
+        """
         return self.task_config.get_value(name, default)
 
     def get_priority_layer(self, identifier):
+        """Get priority layer dict by its UUID.
+
+        :param identifier: Priority Layer UUID
+        :type identifier: str
+
+        :return: Priority Layer dict
+        :rtype: typing.Dict
+        """
         return self.task_config.get_priority_layer(identifier)
 
     def get_activity(self, activity_uuid):
+        """Get activity object by its UUID.
+
+        :param activity_uuid: activity UUID
+        :type activity_uuid: str
+
+        :return: Activity object or None if not found
+        :rtype: typing.Union[Activity, None]
+        """
         return self.task_config.get_activity(activity_uuid)
 
     def get_priority_layers(self):
+        """Get all priority layers.
+
+        :return: List of priority layer dictionary
+        :rtype: typing.List
+        """
         return self.task_config.get_priority_layers()
 
     def get_masking_layers(self):
+        """Get masking layers
+
+        :return: list of mask layer file path
+        :rtype: List
+        """
         masking_layers_paths = self.get_settings_value(
             Settings.MASK_LAYERS_PATHS, default=None
         )
@@ -93,6 +133,11 @@ class ScenarioAnalysisTask(QgsTask):
         return masking_layers
 
     def cancel_task(self, exception=None):
+        """Cancel current task.
+
+        :param exception: exception if any, defaults to None
+        :type exception: Exception, optional
+        """
         self.error = exception
         try:
             self.cancel()
@@ -108,6 +153,20 @@ class ScenarioAnalysisTask(QgsTask):
         info: bool = True,
         notify: bool = True,
     ):
+        """Handle when log is received from running task.
+
+        :param message: Message log
+        :type message: str
+
+        :param name: log name, defaults to "qgis_cplus"
+        :type name: str, optional
+
+        :param info: True if it is information log, defaults to True
+        :type info: bool, optional
+
+        :param notify: Not used in API, defaults to True
+        :type notify: bool, optional
+        """
         self.log_received.emit(message, name, info, notify)
 
     def on_terminated(self):
@@ -287,14 +346,31 @@ class ScenarioAnalysisTask(QgsTask):
             self.log_message(f"Error from task scenario task {self.error}")
 
     def set_status_message(self, message):
+        """Handle when status message is updated.
+
+        :param message: status message
+        :type message: str
+        """
         self.status_message = message
         self.status_message_changed.emit(self.status_message)
 
     def set_info_message(self, message, level=Qgis.Info):
+        """Handle when info message is updated.
+
+        :param message: message
+        :type message: str
+        :param level: severity level, defaults to Qgis.Info
+        :type level: int, optional
+        """
         self.info_message = message
         self.info_message_changed.emit(self.info_message, level)
 
     def set_custom_progress(self, value):
+        """Handle when progress value is updated.
+
+        :param value: progress value
+        :type value: float
+        """
         self.custom_progress = value
         self.custom_progress_changed.emit(self.custom_progress)
 

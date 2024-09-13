@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    Handles storage and retrieval of the plugin QgsSettings.
+    Handles retrieval of the task config.
 """
 
 import enum
