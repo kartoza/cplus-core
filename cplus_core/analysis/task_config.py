@@ -18,6 +18,7 @@ class TaskConfig(object):
     priority_layers: typing.List = []
     priority_layer_groups: typing.List = []
     analysis_activities: typing.List[Activity] = []
+    all_activities: typing.List[Activity] = []
 
     # config
     snapping_enabled: bool = DEFAULT_VALUES.snapping_enabled
@@ -45,6 +46,7 @@ class TaskConfig(object):
         priority_layers,
         priority_layer_groups,
         analysis_activities,
+        all_activities,
         snapping_enabled=False,
         snap_rescale=DEFAULT_VALUES.snap_rescale,
         snap_method=DEFAULT_VALUES.snap_method,
@@ -72,6 +74,9 @@ class TaskConfig(object):
 
         :param analysis_activities: scenario activities
         :type analysis_activities: List[Activity]
+
+        :param all_activities: every activities from main config
+        :type all_activities: List[Activity]
 
         :param snapping_enabled: enable snapping, defaults to False
         :type snapping_enabled: bool, optional
@@ -123,6 +128,7 @@ class TaskConfig(object):
         self.priority_layers = priority_layers
         self.priority_layer_groups = priority_layer_groups
         self.analysis_activities = analysis_activities
+        self.all_activities = all_activities
 
         self.snapping_enabled = snapping_enabled
         self.pathway_suitability_index = pathway_suitability_index
@@ -153,7 +159,7 @@ class TaskConfig(object):
         """
         activity = None
         filtered = [
-            act for act in self.analysis_activities if
+            act for act in self.all_activities if
             str(act.uuid) == activity_uuid
         ]
         if filtered:
