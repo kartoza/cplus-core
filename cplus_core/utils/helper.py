@@ -189,6 +189,7 @@ def align_rasters(
             f"Problem occured when snapping, {str(e)}."
             f" Update snap settings and re-run the analysis"
         )
+        logs.append(traceback.format_exc())
 
         return None, logs
 
