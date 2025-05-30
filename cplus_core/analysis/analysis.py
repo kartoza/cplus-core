@@ -180,6 +180,24 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr(message))
         self.log_message(message)
 
+    def get_reference_layer(self):
+        """Get the path of the reference layer
+
+        Returns:
+            str|None: Return the path of the reference layer or None is it doesn't exist
+        """
+        snapping_enabled = self.get_settings_value(
+            Settings.SNAPPING_ENABLED, default=False, setting_type=bool
+        )
+        reference_layer = self.get_settings_value(Settings.SNAP_LAYER, default="")
+        reference_layer_path = Path(reference_layer)
+        if (
+            snapping_enabled
+            and os.path.exists(reference_layer)
+            and reference_layer_path.is_file()
+        ):
+            return reference_layer
+
     def run(self):
         """Runs the main scenario analysis task operations"""
 
@@ -232,12 +250,10 @@ class ScenarioAnalysisTask(QgsTask):
         snapping_enabled = self.get_settings_value(
             Settings.SNAPPING_ENABLED, default=False, setting_type=bool
         )
-        reference_layer = self.get_settings_value(Settings.SNAP_LAYER, default="")
-        reference_layer_path = Path(reference_layer)
+        reference_layer = self.get_reference_layer()
         if (
             snapping_enabled
-            and os.path.exists(reference_layer)
-            and reference_layer_path.is_file()
+            and reference_layer
         ):
             self.snap_analysis_data(
                 self.analysis_activities,
@@ -1041,7 +1057,9 @@ class ScenarioAnalysisTask(QgsTask):
                 )
 
                 # Actual processing calculation
-
+                reference_layer = self.get_reference_layer()
+                if (reference_layer is None or reference_layer == "") and len(layers) > 0:
+                    reference_layer = layers[0]                    
                 alg_params = {
                     "IGNORE_NODATA": True,
                     "INPUT": layers,
@@ -2139,6 +2157,9 @@ class ScenarioAnalysisTask(QgsTask):
                 output = (
                     QgsProcessing.TEMPORARY_OUTPUT if temporary_output else output_file
                 )
+                reference_layer = self.get_reference_layer()
+                if (reference_layer is None or reference_layer == "") and len(layers) > 0:
+                    reference_layer = layers[0]  
 
                 alg_params = {
                     "IGNORE_NODATA": True,
@@ -2262,6 +2283,10 @@ class ScenarioAnalysisTask(QgsTask):
             output_file = (
                 QgsProcessing.TEMPORARY_OUTPUT if temporary_output else output_file
             )
+
+            reference_layer = self.get_reference_layer()
+            if (reference_layer is None or reference_layer == ""):
+                reference_layer = list(layers.values())[0] 
 
             alg_params = {
                 "IGNORE_NODATA": True,
