@@ -742,8 +742,8 @@ class ScenarioAnalysisTask(QgsTask):
 
         self.set_status_message(
             tr(
-                "Snapping the selected activity pathways, "
-                "carbon layers and priority layers"
+                "Snapping the selected activity pathways "
+                "and priority layers"
             )
         )
 
