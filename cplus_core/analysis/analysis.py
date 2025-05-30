@@ -1131,6 +1131,20 @@ class ScenarioAnalysisTask(QgsTask):
                     f" not a valid layer."
                 )
                 return False
+            
+            if extent_layer.crs() != mask_layer.crs():
+                self.log_message(
+                    f"Skipping masking, the mask layers crs ({mask_layer.crs().authid()})"
+                    f" do not match the scenario crs ({extent_layer.crs().authid()})."
+                )
+                return False
+
+            if not extent_layer.extent().intersects(mask_layer.extent()):
+                self.log_message(
+                    "Skipping masking, the mask layers extent"
+                    " and the scenario extent do not overlap."
+                )
+                return False
 
             for activity in activities:
                 if activity.path is None or activity.path == "":
