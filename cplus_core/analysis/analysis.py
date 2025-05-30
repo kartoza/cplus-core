@@ -912,6 +912,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         except Exception as e:
             self.log_message(f"Problem snapping layers, {e} \n")
+            self.log_message(traceback.format_exc())
             self.cancel_task(e)
             return False
 
@@ -2193,6 +2194,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         except Exception as e:
             self.log_message(f"Problem cleaning activities, {e}")
+            self.log_message(traceback.format_exc())
             self.cancel_task(e)
             return False
 
@@ -2322,6 +2324,7 @@ class ScenarioAnalysisTask(QgsTask):
                     'scenario analysis, error message "{}"'.format(str(err))
                 )
             )
+            self.log_message(traceback.format_exc())
             self.cancel_task(err)
             return False
 
