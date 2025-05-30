@@ -1065,7 +1065,7 @@ class ScenarioAnalysisTask(QgsTask):
                     "INPUT": layers,
                     "EXTENT": extent,
                     "OUTPUT_NODATA_VALUE": -9999,
-                    "REFERENCE_LAYER": layers[0] if len(layers) > 0 else None,
+                    "REFERENCE_LAYER": reference_layer  ,
                     "STATISTIC": 0,  # Sum
                     "OUTPUT": output,
                 }
@@ -2166,7 +2166,7 @@ class ScenarioAnalysisTask(QgsTask):
                     "INPUT": layers,
                     "EXTENT": extent,
                     "OUTPUT_NODATA_VALUE": 0,
-                    "REFERENCE_LAYER": layers[0] if len(layers) > 0 else None,
+                    "REFERENCE_LAYER": reference_layer,
                     "STATISTIC": 0,  # Sum
                     "OUTPUT": output,
                 }
@@ -2293,9 +2293,7 @@ class ScenarioAnalysisTask(QgsTask):
                 "INPUT_RASTERS": sources,
                 "EXTENT": extent_string,
                 "OUTPUT_NODATA_VALUE": -9999,
-                "REFERENCE_LAYER": list(layers.values())[0]
-                if len(layers) >= 1
-                else None,
+                "REFERENCE_LAYER": reference_layer,
                 "OUTPUT": output_file,
             }
 
