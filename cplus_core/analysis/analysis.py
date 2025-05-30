@@ -3,7 +3,9 @@
  Plugin tasks related to the scenario analysis
 
 """
+import datetime
 import os
+import traceback
 import uuid
 from pathlib import Path
 import typing
@@ -29,8 +31,12 @@ from ..definitions.defaults import (
     SCENARIO_OUTPUT_FILE_NAME,
 )
 from ..models.base import ScenarioResult, Activity, NcsPathway
-from ..models.helpers import clone_activity
-from ..utils.helper import align_rasters, clean_filename, tr, BaseFileUtils
+from ..utils.helper import (
+    align_rasters,
+    clean_filename,
+    tr,
+    BaseFileUtils
+)
 from .task_config import TaskConfig
 
 
@@ -180,6 +186,24 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr(message))
         self.log_message(message)
 
+    def get_reference_layer(self):
+        """Get the path of the reference layer
+
+        Returns:
+            str|None: Return the path of the reference layer or None is it doesn't exist
+        """
+        snapping_enabled = self.get_settings_value(
+            Settings.SNAPPING_ENABLED, default=False, setting_type=bool
+        )
+        reference_layer = self.get_settings_value(Settings.SNAP_LAYER, default="")
+        reference_layer_path = Path(reference_layer)
+        if (
+            snapping_enabled
+            and os.path.exists(reference_layer)
+            and reference_layer_path.is_file()
+        ):
+            return reference_layer
+
     def run(self):
         """Runs the main scenario analysis task operations"""
 
@@ -232,12 +256,10 @@ class ScenarioAnalysisTask(QgsTask):
         snapping_enabled = self.get_settings_value(
             Settings.SNAPPING_ENABLED, default=False, setting_type=bool
         )
-        reference_layer = self.get_settings_value(Settings.SNAP_LAYER, default="")
-        reference_layer_path = Path(reference_layer)
+        reference_layer = self.get_reference_layer()
         if (
             snapping_enabled
-            and os.path.exists(reference_layer)
-            and reference_layer_path.is_file()
+            and reference_layer
         ):
             self.snap_analysis_data(
                 self.analysis_activities,
@@ -258,7 +280,7 @@ class ScenarioAnalysisTask(QgsTask):
             temporary_output=not save_output,
         )
 
-        # Creating activities from the normalized pathways
+        # Creating activities from the weigghted pathways
         save_output = self.get_settings_value(
             Settings.LANDUSE_PROJECT, default=True, setting_type=bool
         )
@@ -280,11 +302,13 @@ class ScenarioAnalysisTask(QgsTask):
                 extent_string,
             )
 
+        # Run internal masking of the activities layers
         self.run_internal_activities_masking(
             self.analysis_activities,
             extent_string,
         )
 
+        # TODO enable the sieve functionality
         sieve_enabled = self.get_settings_value(
             Settings.SIEVE_ENABLED, default=False, setting_type=bool
         )
@@ -294,19 +318,11 @@ class ScenarioAnalysisTask(QgsTask):
                 self.analysis_activities,
             )
 
-        # After creating activities, we normalize them using the
-        # suitability index
+        # Clean up activities
         save_output = self.get_settings_value(
             Settings.LANDUSE_NORMALIZED, default=True, setting_type=bool
         )
 
-        # self.run_activities_normalization(
-        #     self.analysis_activities,
-        #     extent_string,
-        #     temporary_output=not save_output,
-        # )
-
-        # Post weighting analysis
         self.run_activities_cleaning(
             self.analysis_activities,
             extent_string,
@@ -417,7 +433,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         return target_extent
 
-    def replace_nodata(self, layer_path, output_path, nodata_value):
+    def replace_nodata(self, layer_path, output_path, nodata_value: float = -9999.0):
         """Adds nodata value info into the layer available
         in the passed layer_path and save the layer in the passed output_path
         path.
@@ -465,7 +481,7 @@ class ScenarioAnalysisTask(QgsTask):
                 "EXTRA": "",
                 "INPUT": translate_output["OUTPUT"],
                 "MULTITHREADING": False,
-                "NODATA": -9999,
+                "NODATA": nodata_value,
                 "OPTIONS": "",
                 "RESAMPLING": 0,  # Nearest Neighbour
                 "SOURCE_CRS": None,
@@ -709,7 +725,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         return True
 
-    def snap_analysis_data(self, activities, extent):
+    def snap_analysis_data(self, activities: typing.List[Activity], extent: str):
         """Snaps the passed activities pathways, carbon layers and priority
         layers to align with the reference layer set on the settings
         manager.
@@ -726,12 +742,12 @@ class ScenarioAnalysisTask(QgsTask):
 
         self.set_status_message(
             tr(
-                "Snapping the selected activity pathways, "
-                "carbon layers and priority layers"
+                "Snapping the selected activity pathways "
+                "and priority layers"
             )
         )
 
-        pathways = []
+        pathways :typing.List[NcsPathway] = []
 
         try:
             for activity in activities:
@@ -778,124 +794,81 @@ class ScenarioAnalysisTask(QgsTask):
                     if self.processing_cancelled:
                         return False
 
-                    # carbon layer snapping
-
-                    self.log_message(
-                        f"Snapping carbon layers from {pathway.name} pathway"
-                    )
-
-                    if (
-                        pathway.carbon_paths is not None
-                        and len(pathway.carbon_paths) > 0
-                    ):
-                        snapped_carbon_directory = os.path.join(
-                            self.scenario_directory, "carbon_layers"
-                        )
-
-                        BaseFileUtils.create_new_dir(snapped_carbon_directory)
-
-                        snapped_carbon_paths = []
-
-                        for carbon_path in pathway.carbon_paths:
-                            carbon_layer = QgsRasterLayer(
-                                carbon_path, f"{str(uuid.uuid4())[:4]}"
-                            )
-                            nodata_value_carbon = (
-                                carbon_layer.dataProvider().sourceNoDataValue(1)
-                            )
-
-                            carbon_output_path = self.snap_layer(
-                                carbon_path,
-                                reference_layer_path,
-                                extent,
-                                snapped_carbon_directory,
-                                rescale_values,
-                                resampling_method,
-                                nodata_value_carbon,
-                            )
-
-                            if carbon_output_path:
-                                snapped_carbon_paths.append(carbon_output_path)
-                            else:
-                                snapped_carbon_paths.append(carbon_path)
-
-                        pathway.carbon_paths = snapped_carbon_paths
-
                     self.log_message(f"Snapping {pathway.name} pathway layer \n")
 
                     # Pathway snapping
 
                     output_path = self.snap_layer(
-                        pathway.path,
-                        reference_layer_path,
-                        extent,
-                        snapped_pathways_directory,
-                        rescale_values,
-                        resampling_method,
-                        nodata_value,
+                        input_path=pathway.path,
+                        reference_path=reference_layer_path,
+                        extent=extent,
+                        directory=snapped_pathways_directory,
+                        rescale_values=rescale_values,
+                        resampling_method=resampling_method,
+                        nodata_value=nodata_value,
                     )
                     if output_path:
                         pathway.path = output_path
 
-            for activity in activities:
-                self.log_message(
-                    f"Snapping {len(activity.priority_layers)} "
-                    f"priority weighting layers from activity {activity.name} with layers\n"
-                )
-
-                if (
-                    activity.priority_layers is not None
-                    and len(activity.priority_layers) > 0
-                ):
-                    snapped_priority_directory = os.path.join(
-                        self.scenario_directory, "priority_layers"
+                    self.log_message(
+                        f"Snapping {len(pathway.priority_layers)} "
+                        f"priority weighting layers from pathway {pathway.name} with layers\n"
                     )
 
-                    BaseFileUtils.create_new_dir(snapped_priority_directory)
-
-                    priority_layers = []
-                    for priority_layer in activity.priority_layers:
-                        if priority_layer is None:
-                            continue
-
-                        priority_layer_settings = self.get_priority_layer(
-                            priority_layer.get("uuid")
+                    if (
+                        pathway.priority_layers is not None
+                        and len(pathway.priority_layers) > 0
+                    ):
+                        snapped_priority_directory = os.path.join(
+                            self.scenario_directory, "priority_layers"
                         )
-                        if priority_layer_settings is None:
-                            continue
 
-                        priority_layer_path = priority_layer_settings.get("path")
+                        BaseFileUtils.create_new_dir(snapped_priority_directory)
 
-                        if not Path(priority_layer_path).exists():
+                        priority_layers = []
+                        for priority_layer in pathway.priority_layers:
+                            if priority_layer is None:
+                                continue
+
+                            priority_layer_settings = self.get_priority_layer(
+                                priority_layer.get("uuid")
+                            )
+                            if priority_layer_settings is None:
+                                continue
+
+                            priority_layer_path = priority_layer_settings.get("path")
+
+                            if not Path(priority_layer_path).exists():
+                                priority_layers.append(priority_layer)
+                                continue
+
+                            layer = QgsRasterLayer(
+                                priority_layer_path, f"{str(uuid.uuid4())[:4]}"
+                            )
+                            nodata_value_priority = layer.dataProvider().sourceNoDataValue(
+                                1
+                            )
+
+                            priority_output_path = self.snap_layer(
+                                input_path=priority_layer_path,
+                                reference_path=reference_layer_path,
+                                extent=extent,
+                                directory=snapped_priority_directory,
+                                rescale_values=rescale_values,
+                                resampling_method=resampling_method,
+                                nodata_value=nodata_value_priority,
+                            )
+
+                            if priority_output_path:
+                                priority_layer["path"] = priority_output_path
+
                             priority_layers.append(priority_layer)
-                            continue
 
-                        layer = QgsRasterLayer(
-                            priority_layer_path, f"{str(uuid.uuid4())[:4]}"
-                        )
-                        nodata_value_priority = layer.dataProvider().sourceNoDataValue(
-                            1
-                        )
-
-                        priority_output_path = self.snap_layer(
-                            priority_layer_path,
-                            reference_layer_path,
-                            extent,
-                            snapped_priority_directory,
-                            rescale_values,
-                            resampling_method,
-                            nodata_value_priority,
-                        )
-
-                        if priority_output_path:
-                            priority_layer["path"] = priority_output_path
-
-                        priority_layers.append(priority_layer)
-
-                    activity.priority_layers = priority_layers
+                        pathway.priority_layers = priority_layers
 
         except Exception as e:
             self.log_message(f"Problem snapping layers, {e} \n")
+            self.log_message(traceback.format_exc())
             self.cancel_task(e)
             return False
 
@@ -903,13 +876,13 @@ class ScenarioAnalysisTask(QgsTask):
 
     def snap_layer(
         self,
-        input_path,
-        reference_path,
-        extent,
-        directory,
-        rescale_values,
-        resampling_method,
-        nodata_value,
+        input_path: str,
+        reference_path: str,
+        extent: str,
+        directory: str,
+        rescale_values: bool,
+        resampling_method: int,
+        nodata_value: float = -9999.0,
     ):
         """Snaps the passed input layer using the reference layer and updates
         the snap output no data value to be the same as the original input layer
@@ -949,6 +922,8 @@ class ScenarioAnalysisTask(QgsTask):
         )
         for log in logs:
             self.log_message(log, info=("Problem" not in log))
+        
+        output_path = input_path
 
         if input_result_path is not None:
             result_path = Path(input_result_path)
@@ -1041,13 +1016,15 @@ class ScenarioAnalysisTask(QgsTask):
                 )
 
                 # Actual processing calculation
-
+                reference_layer = self.get_reference_layer()
+                if (reference_layer is None or reference_layer == "") and len(layers) > 0:
+                    reference_layer = layers[0]                    
                 alg_params = {
                     "IGNORE_NODATA": True,
                     "INPUT": layers,
                     "EXTENT": extent,
                     "OUTPUT_NODATA_VALUE": -9999,
-                    "REFERENCE_LAYER": layers[0] if len(layers) > 0 else None,
+                    "REFERENCE_LAYER": reference_layer  ,
                     "STATISTIC": 0,  # Sum
                     "OUTPUT": output,
                 }
@@ -1152,6 +1129,20 @@ class ScenarioAnalysisTask(QgsTask):
                     f"Skipping activities masking "
                     f"the created difference mask layer {mask_layer.source()},"
                     f" not a valid layer."
+                )
+                return False
+            
+            if extent_layer.crs() != mask_layer.crs():
+                self.log_message(
+                    f"Skipping masking, the mask layers crs ({mask_layer.crs().authid()})"
+                    f" do not match the scenario crs ({extent_layer.crs().authid()})."
+                )
+                return False
+
+            if not extent_layer.extent().intersects(mask_layer.extent()):
+                self.log_message(
+                    "Skipping masking, the mask layers extent"
+                    " and the scenario extent do not overlap."
                 )
                 return False
 
@@ -1303,8 +1294,8 @@ class ScenarioAnalysisTask(QgsTask):
 
                 if extent_layer.crs() != initial_mask_layer.crs():
                     self.log_message(
-                        "Skipping masking, the mask layers crs"
-                        " do not match the scenario crs."
+                        f"Skipping masking, the mask layers crs ({initial_mask_layer.crs().authid()})"
+                        f" do not match the scenario crs ({extent_layer.crs().authid()})."
                     )
                     continue
 
@@ -1905,179 +1896,6 @@ class ScenarioAnalysisTask(QgsTask):
 
         return True
 
-    def run_activities_weighting(
-        self, activities, priority_layers_groups, extent, temporary_output=False
-    ):
-        """Runs weighting analysis on the passed activities using
-        the corresponding activities weight layers.
-
-        :param activities: List of the selected activities
-        :type activities: typing.List[Activity]
-
-        :param priority_layers_groups: Used priority layers groups and their values
-        :type priority_layers_groups: dict
-
-        :param extent: selected extent from user
-        :type extent: str
-
-        :param temporary_output: Whether to save the processing outputs as temporary
-        files
-        :type temporary_output: bool
-
-        :returns: A tuple with the weighted activities outputs and
-        a value of whether the task operations was successful
-        :rtype: typing.Tuple[typing.List, bool]
-        """
-
-        if self.processing_cancelled:
-            return [], False
-
-        self.set_status_message(tr("Weighting activities"))
-
-        weighted_activities = []
-
-        try:
-            for original_activity in activities:
-                activity = clone_activity(original_activity)
-
-                if activity.path is None or activity.path == "":
-                    self.set_info_message(
-                        tr(
-                            f"Problem when running activities weighting, "
-                            f"there is no map layer for the activity {activity.name}"
-                        ),
-                        level=Qgis.Critical,
-                    )
-                    self.log_message(
-                        f"Problem when running activities weighting, "
-                        f"there is no map layer for the activity {activity.name}"
-                    )
-
-                    return [], False
-
-                basenames = []
-                layers = []
-
-                layers.append(activity.path)
-                basenames.append(f'"{Path(activity.path).stem}@1"')
-
-                if not any(priority_layers_groups):
-                    self.log_message(
-                        "There are no defined priority layers in groups,"
-                        " skipping activities weighting step."
-                    )
-                    self.run_activities_cleaning(
-                        extent, temporary_output=temporary_output
-                    )
-                    return
-
-                if activity.priority_layers is None or activity.priority_layers is []:
-                    self.log_message(
-                        f"There are no associated "
-                        f"priority weighting layers for activity {activity.name}"
-                    )
-                    continue
-
-                settings_activity = self.get_activity(str(activity.uuid))
-
-                for layer in settings_activity.priority_layers:
-                    if layer is None:
-                        continue
-
-                    settings_layer = self.get_priority_layer(layer.get("uuid"))
-                    if settings_layer is None:
-                        continue
-
-                    pwl = settings_layer.get("path")
-
-                    missing_pwl_message = (
-                        f"Path {pwl} for priority "
-                        f"weighting layer {layer.get('name')} "
-                        f"doesn't exist, skipping the layer "
-                        f"from the activity {activity.name} weighting."
-                    )
-                    if pwl is None:
-                        self.log_message(missing_pwl_message)
-                        continue
-
-                    pwl_path = Path(pwl)
-
-                    if not pwl_path.exists():
-                        self.log_message(missing_pwl_message)
-                        continue
-
-                    path_basename = pwl_path.stem
-
-                    for priority_layer in self.get_priority_layers():
-                        if priority_layer.get("name") == layer.get("name"):
-                            for group in priority_layer.get("groups", []):
-                                value = group.get("value")
-                                coefficient = float(value)
-                                if coefficient > 0:
-                                    if pwl not in layers:
-                                        layers.append(pwl)
-                                    basenames.append(
-                                        f'({coefficient}*"{path_basename}@1")'
-                                    )
-
-                if basenames is []:
-                    return [], True
-
-                weighted_activities_directory = os.path.join(
-                    self.scenario_directory, "weighted_activities"
-                )
-
-                BaseFileUtils.create_new_dir(weighted_activities_directory)
-
-                file_name = clean_filename(activity.name.replace(" ", "_"))
-                output_file = os.path.join(
-                    weighted_activities_directory,
-                    f"{file_name}_{str(uuid.uuid4())[:4]}.tif",
-                )
-                expression = " + ".join(basenames)
-
-                output = (
-                    QgsProcessing.TEMPORARY_OUTPUT if temporary_output else output_file
-                )
-
-                # Actual processing calculation
-                alg_params = {
-                    "CELLSIZE": 0,
-                    "CRS": None,
-                    "EXPRESSION": expression,
-                    "EXTENT": extent,
-                    "LAYERS": layers,
-                    "OUTPUT": output,
-                }
-
-                self.log_message(
-                    f" Used parameters for calculating weighting activities {alg_params} \n"
-                )
-
-                feedback = QgsProcessingFeedback()
-
-                feedback.progressChanged.connect(self.update_progress)
-
-                if self.processing_cancelled:
-                    return [], False
-
-                results = processing.run(
-                    "qgis:rastercalculator",
-                    alg_params,
-                    context=self.processing_context,
-                    feedback=self.feedback,
-                )
-                activity.path = results["OUTPUT"]
-
-                weighted_activities.append(activity)
-
-        except Exception as e:
-            self.log_message(f"Problem weighting activities, {e}\n")
-            self.cancel_task(e)
-            return None, False
-
-        return weighted_activities, True
-
     def run_activities_cleaning(
             self,
             activities: typing.List[Activity],
@@ -2104,6 +1922,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         self.set_status_message(tr("Updating weighted activity values"))
 
+
         try:
             for activity in activities:
                 if activity.path is None or activity.path == "":
@@ -2125,11 +1944,14 @@ class ScenarioAnalysisTask(QgsTask):
 
                 file_name = clean_filename(activity.name.replace(" ", "_"))
 
-                output_file = os.path.join(
-                    self.scenario_directory, "weighted_activities"
+                weighted_pathways_dir = os.path.join(
+                    self.scenario_directory, "weighted_pathways"
                 )
+
+                BaseFileUtils.create_new_dir(weighted_pathways_dir)
+                
                 output_file = os.path.join(
-                    output_file, f"{file_name}_{str(uuid.uuid4())[:4]}_cleaned.tif"
+                    weighted_pathways_dir, f"{file_name}_{str(uuid.uuid4())[:4]}_cleaned.tif"
                 )
 
                 # Actual processing calculation
@@ -2139,13 +1961,16 @@ class ScenarioAnalysisTask(QgsTask):
                 output = (
                     QgsProcessing.TEMPORARY_OUTPUT if temporary_output else output_file
                 )
+                reference_layer = self.get_reference_layer()
+                if (reference_layer is None or reference_layer == "") and len(layers) > 0:
+                    reference_layer = layers[0]  
 
                 alg_params = {
                     "IGNORE_NODATA": True,
                     "INPUT": layers,
                     "EXTENT": extent,
                     "OUTPUT_NODATA_VALUE": 0,
-                    "REFERENCE_LAYER": layers[0] if len(layers) > 0 else None,
+                    "REFERENCE_LAYER": reference_layer,
                     "STATISTIC": 0,  # Sum
                     "OUTPUT": output,
                 }
@@ -2172,12 +1997,13 @@ class ScenarioAnalysisTask(QgsTask):
 
         except Exception as e:
             self.log_message(f"Problem cleaning activities, {e}")
+            self.log_message(traceback.format_exc())
             self.cancel_task(e)
             return False
 
         return True
 
-    def run_highest_position_analysis(self, temporary_output: bool = False):
+    def run_highest_position_analysis(self, temporary_output: bool =False):
         """Runs the highest position analysis which is last step
         in scenario analysis. Uses the activities set by the current ongoing
         analysis.
@@ -2202,8 +2028,13 @@ class ScenarioAnalysisTask(QgsTask):
             passed_extent_box[3],
         )
 
+        # We explicitly set the created_date since the current implementation
+        # of the data model means that the attribute value is set only once when
+        # the class is loaded hence subsequent instances will have the same value.
         self.scenario_result = ScenarioResult(
-            scenario=self.scenario, scenario_directory=self.scenario_directory
+            scenario=self.scenario,
+            scenario_directory=self.scenario_directory,
+            created_date=datetime.datetime.now(),
         )
 
         try:
@@ -2211,7 +2042,7 @@ class ScenarioAnalysisTask(QgsTask):
 
             self.set_status_message(tr("Calculating the highest position"))
 
-            for activity in self.analysis_weighted_activities:
+            for activity in self.analysis_activities:
                 if activity.path is not None and activity.path != "":
                     raster_layer = QgsRasterLayer(activity.path, activity.name)
                     layers[activity.name] = (
@@ -2237,12 +2068,9 @@ class ScenarioAnalysisTask(QgsTask):
 
             # Preparing the input rasters for the highest position
             # analysis in a correct order
-
-            activity_names = [
-                activity.name for activity in self.analysis_weighted_activities
-            ]
+            activity_names = [activity.name for activity in self.analysis_activities]
             all_activities = sorted(
-                self.analysis_weighted_activities,
+                self.analysis_activities,
                 key=lambda activity_instance: activity_instance.style_pixel_value,
             )
             for index, activity in enumerate(all_activities):
@@ -2263,14 +2091,16 @@ class ScenarioAnalysisTask(QgsTask):
                 QgsProcessing.TEMPORARY_OUTPUT if temporary_output else output_file
             )
 
+            reference_layer = self.get_reference_layer()
+            if (reference_layer is None or reference_layer == "") and len(layers) > 0:
+                reference_layer = list(layers.values())[0] 
+
             alg_params = {
                 "IGNORE_NODATA": True,
                 "INPUT_RASTERS": sources,
                 "EXTENT": extent_string,
                 "OUTPUT_NODATA_VALUE": -9999,
-                "REFERENCE_LAYER": list(layers.values())[0]
-                if len(layers) >= 1
-                else None,
+                "REFERENCE_LAYER": reference_layer,
                 "OUTPUT": output_file,
             }
 
@@ -2299,6 +2129,7 @@ class ScenarioAnalysisTask(QgsTask):
                     'scenario analysis, error message "{}"'.format(str(err))
                 )
             )
+            self.log_message(traceback.format_exc())
             self.cancel_task(err)
             return False
 
