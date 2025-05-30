@@ -7,6 +7,7 @@
 import os
 import json
 import uuid
+import traceback
 import datetime
 from pathlib import Path
 from uuid import UUID
@@ -18,6 +19,8 @@ from qgis.core import (
     QgsCoordinateTransform,
     QgsProject,
     QgsRasterLayer,
+    QgsVectorLayer,
+    QgsVectorFileWriter
 )
 
 from qgis.analysis import QgsAlignRaster
