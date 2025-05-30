@@ -1944,8 +1944,14 @@ class ScenarioAnalysisTask(QgsTask):
 
                 file_name = clean_filename(activity.name.replace(" ", "_"))
 
+                weighted_pathways_dir = os.path.join(
+                    self.scenario_directory, "weighted_pathways"
+                )
+
+                BaseFileUtils.create_new_dir(weighted_pathways_dir)
+                
                 output_file = os.path.join(
-                    self.scenario_directory, f"{file_name}_{str(uuid.uuid4())[:4]}_cleaned.tif"
+                    weighted_pathways_dir, f"{file_name}_{str(uuid.uuid4())[:4]}_cleaned.tif"
                 )
 
                 # Actual processing calculation
@@ -2086,7 +2092,7 @@ class ScenarioAnalysisTask(QgsTask):
             )
 
             reference_layer = self.get_reference_layer()
-            if (reference_layer is None or reference_layer == ""):
+            if (reference_layer is None or reference_layer == "") and len(layers) > 0:
                 reference_layer = list(layers.values())[0] 
 
             alg_params = {
