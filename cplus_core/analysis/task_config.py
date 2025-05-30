@@ -23,7 +23,7 @@ class TaskConfig(object):
     # config
     snapping_enabled: bool = DEFAULT_VALUES.snapping_enabled
     snap_layer = ""
-    snap_rescale = DEFAULT_VALUES.snap_rescale
+    snap_rescale: bool = DEFAULT_VALUES.snap_rescale
     snap_method = DEFAULT_VALUES.snap_method
     pathway_suitability_index = DEFAULT_VALUES.pathway_suitability_index
     carbon_coefficient = DEFAULT_VALUES.carbon_coefficient
@@ -48,7 +48,9 @@ class TaskConfig(object):
         analysis_activities,
         all_activities,
         snapping_enabled=False,
-        snap_rescale=DEFAULT_VALUES.snap_rescale,
+        snap_layer=None,
+        mask_layers_paths="",
+        snap_rescale: bool = DEFAULT_VALUES.snap_rescale,
         snap_method=DEFAULT_VALUES.snap_method,
         pathway_suitability_index=DEFAULT_VALUES.pathway_suitability_index,  # noqa
         carbon_coefficient=DEFAULT_VALUES.carbon_coefficient,
@@ -137,6 +139,9 @@ class TaskConfig(object):
         self.snap_method = snap_method
         self.sieve_enabled = sieve_enabled
         self.sieve_threshold = sieve_threshold
+        self.snap_layer = snap_layer
+
+        self.mask_layers_paths = mask_layers_paths
 
         # output selections
         self.ncs_with_carbon = ncs_with_carbon
