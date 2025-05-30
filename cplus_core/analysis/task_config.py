@@ -244,7 +244,6 @@ class TaskConfig(object):
                 "layer_type": activity.layer_type,
                 "user_defined": activity.user_defined,
                 "pathways": [],
-                "priority_layers": activity.priority_layers,
                 "layer_styles": activity.layer_styles,
             }
             for pathway in activity.pathways:
@@ -255,7 +254,7 @@ class TaskConfig(object):
                         "description": pathway.description,
                         "path": pathway.path,
                         "layer_type": pathway.layer_type,
-                        "carbon_paths": pathway.carbon_paths,
+                        "priority_layers": pathway.priority_layers,
                     }
                 )
             input_dict["activities"].append(activity_dict)

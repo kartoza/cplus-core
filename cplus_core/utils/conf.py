@@ -41,6 +41,7 @@ class Settings(enum.Enum):
 
     # Outputs options
     NCS_WITH_CARBON = "ncs_with_carbon"
+    NCS_WEIGHTED = "ncs_weighted"
     LANDUSE_PROJECT = "landuse_project"
     LANDUSE_NORMALIZED = "landuse_normalized"
     LANDUSE_WEIGHTED = "landuse_weighted"
