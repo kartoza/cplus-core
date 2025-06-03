@@ -1030,6 +1030,25 @@ class ScenarioAnalysisTask(QgsTask):
         :type nodata_value: float
 
         """
+        if not os.path.exists(input_path):
+            self.log_message(
+                f"Input layer {input_path} does not exist, "
+                f"skipping the layer from snapping."
+            )
+            return None
+        if not os.path.exists(reference_path):
+            self.log_message(
+                f"Reference layer {reference_path} does not exist, "
+                f"skipping the layer from snapping."
+            )
+            return None
+        if not os.path.exists(directory):
+            self.log_message(
+                f"Output directory {directory} does not exist, "
+                f"skipping the layer from snapping."
+            )
+            return None
+        
 
         input_result_path, logs = align_rasters(
             input_path,
@@ -1038,6 +1057,7 @@ class ScenarioAnalysisTask(QgsTask):
             directory,
             rescale_values,
             resampling_method,
+            name=name,
         )
         for log in logs:
             self.log_message(log, info=("Problem" not in log))
