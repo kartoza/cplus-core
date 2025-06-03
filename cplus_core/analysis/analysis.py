@@ -290,6 +290,9 @@ class ScenarioAnalysisTask(QgsTask):
             )
 
             self.snap_analysis_data(extent_string)
+        
+        # Normalize the pathways
+        self.run_pathways_normalization()
 
         # Weight the pathways using the pathway suitability index
         # and priority group coefficients for the PWLs
@@ -733,11 +736,10 @@ class ScenarioAnalysisTask(QgsTask):
                     if layer is None:
                         continue
 
-                    settings_layer = self.get_priority_layer(layer.get("uuid"))
-                    if settings_layer is None:
+                    if layer.get("uuid") is None:
                         continue
 
-                    pwl = settings_layer.get("path")
+                    pwl = layer.get("path")
 
                     missing_pwl_message = (
                         f"Path {pwl} for priority "
@@ -824,6 +826,7 @@ class ScenarioAnalysisTask(QgsTask):
         except Exception as e:
             self.log_message(f"Problem weighting pathways, {e}\n")
             self.cancel_task(e)
+            self.log_message(traceback.format_exc())
             return False
 
         return True
@@ -893,7 +896,12 @@ class ScenarioAnalysisTask(QgsTask):
 
                     if self.processing_cancelled:
                         return False
-
+                    if not pathway_layer.isValid():
+                        self.log_message(
+                            f"Pathway layer {pathway.name} is not valid, "
+                            f"skipping the layer from snapping."
+                        )
+                        continue
                     self.log_message(f"Snapping {pathway.name} pathway layer \n")
 
                     # Pathway snapping
@@ -906,6 +914,7 @@ class ScenarioAnalysisTask(QgsTask):
                         rescale_values=rescale_values,
                         resampling_method=resampling_method,
                         nodata_value=nodata_value,
+                        name=pathway.name
                     )
                     if output_path:
                         pathway.path = output_path
@@ -920,7 +929,7 @@ class ScenarioAnalysisTask(QgsTask):
                         and len(pathway.priority_layers) > 0
                     ):
                         snapped_priority_directory = os.path.join(
-                            self.scenario_directory, "priority_layers"
+                            self.scenario_directory, "priority_layer"
                         )
 
                         BaseFileUtils.create_new_dir(snapped_priority_directory)
@@ -945,6 +954,14 @@ class ScenarioAnalysisTask(QgsTask):
                             layer = QgsRasterLayer(
                                 priority_layer_path, f"{str(uuid.uuid4())[:4]}"
                             )
+                            if not layer.isValid():
+                                self.log_message(
+                                    f"Priority layer {priority_layer.get('name')} "
+                                    f"from pathway {pathway.name} is not valid, "
+                                    f"skipping the layer from snapping."
+                                )
+                                continue
+
                             nodata_value_priority = layer.dataProvider().sourceNoDataValue(
                                 1
                             )
@@ -957,6 +974,7 @@ class ScenarioAnalysisTask(QgsTask):
                                 rescale_values=rescale_values,
                                 resampling_method=resampling_method,
                                 nodata_value=nodata_value_priority,
+                                name=priority_layer.get("name", "priority layer")
                             )
 
                             if priority_output_path:
@@ -983,6 +1001,7 @@ class ScenarioAnalysisTask(QgsTask):
         rescale_values: bool,
         resampling_method: int,
         nodata_value: float = -9999.0,
+        name: str = "layer"
     ):
         """Snaps the passed input layer using the reference layer and updates
         the snap output no data value to be the same as the original input layer
