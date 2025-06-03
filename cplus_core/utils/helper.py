@@ -110,6 +110,7 @@ def align_rasters(
     output_dir=None,
     rescale_values=False,
     resample_method=0,
+    name="layer"
 ):
     """
     Based from work on https://github.com/inasafe/inasafe/pull/2070
@@ -162,7 +163,7 @@ def align_rasters(
                 int(resample_method))
         except Exception as e:
             logs.append(
-                f"Problem creating a resample value when snapping, {e}")
+                f"Problem creating a resample value when snapping {name}, {e}")
 
         if rescale_values:
             lst[0].rescaleValues = rescale_values
@@ -186,13 +187,13 @@ def align_rasters(
 
         if not align.run():
             logs.append(
-                f"Problem during snapping for {input_raster_source} and "
+                f"Problem during snapping for {name} {input_raster_source} and "
                 f"{reference_raster_source}, {align.errorMessage()}"
             )
             raise Exception(align.errorMessage())
     except Exception as e:
         logs.append(
-            f"Problem occured when snapping, {str(e)}."
+            f"Problem occured when snapping {name}, {str(e)}."
             f" Update snap settings and re-run the analysis"
         )
         logs.append(traceback.format_exc())
@@ -200,7 +201,7 @@ def align_rasters(
         return None, logs
 
     logs.append(
-        f"Finished snapping"
+        f"Finished snapping {name}"
         f" original layer - {input_raster_source},"
         f"snapped output - {input_layer_output} \n"
     )
