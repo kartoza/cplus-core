@@ -35,7 +35,8 @@ from ..utils.helper import (
     align_rasters,
     clean_filename,
     tr,
-    BaseFileUtils
+    BaseFileUtils,
+    normalize_raster_layer
 )
 from .task_config import TaskConfig
 
@@ -251,6 +252,10 @@ class ScenarioAnalysisTask(QgsTask):
         self.log_message(
             "Snapped area of interest extent " f"{snapped_extent.asWktPolygon()} \n"
         )
+
+        # Normalize the pathways
+        self.run_pathways_normalization()
+        
         # Run pathways layers snapping using a specified reference layer
 
         snapping_enabled = self.get_settings_value(
@@ -507,6 +512,98 @@ class ScenarioAnalysisTask(QgsTask):
 
         return False
 
+    def run_pathways_normalization(
+        self, 
+    ) -> bool:
+        """Runs normalization analysis on the pathways in the activities.
+        The formula is: (pathway - min) / (max - min)
+
+        :returns: True if the task operation was successfully completed else False.
+        :rtype: bool
+    """
+        if self.processing_cancelled:
+            return False
+
+        self.set_status_message(tr("Normalization of pathways"))
+        pathways :typing.List[NcsPathway] = []
+
+        try:
+            for activity in self.analysis_activities:
+                if not activity.pathways and (
+                    activity.path is None or activity.path == ""
+                ):
+                    self.set_info_message(
+                        tr(
+                            f"No defined activity pathways or a"
+                            f" activity layer for the activity {activity.name}"
+                        ),
+                        level=Qgis.Critical,
+                    )
+                    self.log_message(
+                        f"No defined activity pathways or a "
+                        f"activity layer for the activity {activity.name}"
+                    )
+                    return False
+
+                for pathway in activity.pathways:
+                    if not (pathway in pathways):
+                        pathways.append(pathway)
+
+            if len(pathways) > 0:
+                normalized_pathways_directory = os.path.join(
+                    self.scenario_directory, "normalized_pathways"
+                )
+
+                BaseFileUtils.create_new_dir(normalized_pathways_directory)
+
+                for pathway in pathways:
+                    if self.processing_cancelled:
+                        return False
+                    
+                    pathway_layer = QgsRasterLayer(pathway.path, pathway.name)
+
+                    if not pathway_layer.isValid():
+                        self.log_message(
+                            f"Pathway layer {pathway.name} is not valid, "
+                            f"skipping the layer from snapping."
+                        )
+                        continue
+
+                    provider = pathway_layer.dataProvider()
+                    band_statistics = provider.bandStatistics(1)
+                    min_value = band_statistics.minimumValue
+                    max_value = band_statistics.maximumValue
+
+                    if min_value is None or max_value is None:
+                        self.log_message(
+                            f"Pathway layer {pathway.name} has no valid "
+                            f"statistics, skipping the layer from normalization."
+                        )
+                        continue
+                    
+                    if min_value >= 0 and max_value <= 1:
+                        self.log_message(
+                            f"Pathway layer {pathway.name} is already normalized, "
+                            f"skipping the layer from normalization."
+                        )
+                        continue                
+                    
+                    self.log_message(f"Normalizing {pathway.name} pathway layer \n")
+
+                    # Pathway normalization
+                    output_path = normalize_raster_layer(
+                        input_path=pathway.path,
+                        output_directory=normalized_pathways_directory
+                    )
+                    if output_path:
+                        pathway.path = output_path
+            return True
+        except Exception as e:
+            self.log_message(f"Problem normalizing pathways, {e} \n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)
+            return False
+        
     def run_pathways_weighting(
         self,
         activities: typing.List[Activity],
