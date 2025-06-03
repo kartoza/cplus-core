@@ -172,7 +172,7 @@ def align_rasters(
         align.setRasters(lst)
         align.setParametersFromRaster(reference_raster_source)
 
-        layer = QgsRasterLayer(input_raster_source, "input_layer")
+        layer = QgsRasterLayer(reference_raster_source, "reference_raster_source")
 
         extent = transform_extent(
             layer.extent(),
