@@ -1194,69 +1194,7 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr("Masking activities using the saved masked layers"))
 
         try:
-            if len(masking_layers) < 1:
-                return False
-
-            if len(masking_layers) > 1:
-                initial_mask_layer = self.merge_vector_layers(masking_layers)
-            else:
-                mask_layer_path = masking_layers[0]
-                initial_mask_layer = QgsVectorLayer(mask_layer_path, "mask", "ogr")
-
-            if not initial_mask_layer.isValid():
-                self.log_message(
-                    f"Skipping activities masking "
-                    f"using layer {mask_layer_path}, not a valid layer."
-                )
-                return False
-
-            # see https://qgis.org/pyqgis/master/core/Qgis.html#qgis.core.Qgis.GeometryType
-            if Qgis.versionInt() < 33000:
-                layer_check = initial_mask_layer.geometryType() == QgsWkbTypes.Polygon
-                layer_check = (
-                    initial_mask_layer.geometryType() == QgsWkbTypes.PolygonGeometry
-                )
-            else:
-                layer_check = (
-                    initial_mask_layer.geometryType() == Qgis.GeometryType.Polygon
-                )
-
-            if not layer_check:
-                self.log_message(
-                    f"Skipping activities masking "
-                    f"using layer {mask_layer_path}, not a polygon layer."
-                )
-                return False
-
-            extent_layer = self.layer_extent(extent)
-            mask_layer = self.mask_layer_difference(initial_mask_layer, extent_layer)
-
-            if isinstance(mask_layer, str):
-                mask_layer = QgsVectorLayer(mask_layer, "ogr")
-
-            if not mask_layer.isValid():
-                self.log_message(
-                    f"Skipping activities masking "
-                    f"the created difference mask layer {mask_layer.source()},"
-                    f" not a valid layer."
-                )
-                return False
-            
-            if extent_layer.crs() != mask_layer.crs():
-                self.log_message(
-                    f"Skipping masking, the mask layers crs ({mask_layer.crs().authid()})"
-                    f" do not match the scenario crs ({extent_layer.crs().authid()})."
-                )
-                return False
-
-            if not extent_layer.extent().intersects(mask_layer.extent()):
-                self.log_message(
-                    "Skipping masking, the mask layers extent"
-                    " and the scenario extent do not overlap."
-                )
-                return False
-
-            for activity in activities:
+            for activity in self.analysis_activities:
                 if activity.path is None or activity.path == "":
                     if not self.processing_cancelled:
                         self.set_info_message(
@@ -1278,6 +1216,70 @@ class ScenarioAnalysisTask(QgsTask):
                         )
                         self.log_message(f"Processing has been cancelled by the user.")
 
+                    return False
+                
+                masking_layers = activity.mask_paths
+
+                if len(masking_layers) < 1:
+                    continue
+
+                if len(masking_layers) > 1:
+                    initial_mask_layer = self.merge_vector_layers(masking_layers)
+                else:
+                    mask_layer_path = masking_layers[0]
+                    initial_mask_layer = QgsVectorLayer(mask_layer_path, "mask", "ogr")
+
+                if not initial_mask_layer.isValid():
+                    self.log_message(
+                        f"Skipping activities masking "
+                        f"using layer {mask_layer_path}, not a valid layer."
+                    )
+                    continue
+
+                # see https://qgis.org/pyqgis/master/core/Qgis.html#qgis.core.Qgis.GeometryType
+                if Qgis.versionInt() < 33000:
+                    layer_check = initial_mask_layer.geometryType() == QgsWkbTypes.Polygon
+                    layer_check = (
+                        initial_mask_layer.geometryType() == QgsWkbTypes.PolygonGeometry
+                    )
+                else:
+                    layer_check = (
+                        initial_mask_layer.geometryType() == Qgis.GeometryType.Polygon
+                    )
+
+                if not layer_check:
+                    self.log_message(
+                        f"Skipping activities masking "
+                        f"using layer {mask_layer_path}, not a polygon layer."
+                    )
+                    return False
+
+                extent_layer = self.layer_extent(extent)
+                mask_layer = self.mask_layer_difference(initial_mask_layer, extent_layer)
+
+                if isinstance(mask_layer, str):
+                    mask_layer = QgsVectorLayer(mask_layer, "ogr")
+
+                if not mask_layer.isValid():
+                    self.log_message(
+                        f"Skipping activities masking "
+                        f"the created difference mask layer {mask_layer.source()},"
+                        f" not a valid layer."
+                    )
+                    return False
+                
+                if extent_layer.crs() != mask_layer.crs():
+                    self.log_message(
+                        f"Skipping masking, the mask layers crs ({mask_layer.crs().authid()})"
+                        f" do not match the scenario crs ({extent_layer.crs().authid()})."
+                    )
+                    return False
+
+                if not extent_layer.extent().intersects(mask_layer.extent()):
+                    self.log_message(
+                        "Skipping masking, the mask layers extent"
+                        " and the scenario extent do not overlap."
+                    )
                     return False
 
                 masked_activities_directory = os.path.join(
@@ -1365,7 +1367,7 @@ class ScenarioAnalysisTask(QgsTask):
 
                 if len(masking_layers) < 1:
                     self.log_message(
-                        f"Skipping activity masking "
+                        f"Skipping internal activity masking "
                         f"No mask layer(s) for activity {activity.name}"
                     )
                     continue
