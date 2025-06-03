@@ -2030,22 +2030,27 @@ class ScenarioAnalysisTask(QgsTask):
         try:
             for activity in self.analysis_activities:
                 if activity.path is None or activity.path == "":
-                    self.set_info_message(
-                        tr(
-                            f"Problem when running activity updates, "
-                            f"there is no map layer for the activity {activity.name}"
-                        ),
-                        level=Qgis.Critical,
-                    )
                     self.log_message(
                         f"Problem when running activity updates, "
                         f"there is no map layer for the activity {activity.name}"
                     )
 
                     return False
+                
+                if not os.path.exists(activity.path):
+                    self.log_message(
+                        f"Problem when running activity updates, "
+                        f"the map layer for the activity {activity.name} does not exist"
+                    )
+                    return False
 
-                layers = [activity.path]
-
+                layer = QgsRasterLayer(activity.path, "activity_layer")
+                if not layer.isValid():                    
+                    self.log_message(
+                        f"Problem when running activity updates, "
+                        f"the map layer for the activity {activity.name} is not valid"
+                    )
+                    return False
                 file_name = clean_filename(activity.name.replace(" ", "_"))
 
                 weighted_pathways_dir = os.path.join(
