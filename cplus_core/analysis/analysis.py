@@ -2066,12 +2066,12 @@ class ScenarioAnalysisTask(QgsTask):
                     QgsProcessing.TEMPORARY_OUTPUT if temporary_output else output_file
                 )
                 reference_layer = self.get_reference_layer()
-                if (reference_layer is None or reference_layer == "") and len(layers) > 0:
-                    reference_layer = layers[0]  
+                if (reference_layer is None or reference_layer == ""):
+                    reference_layer = activity.path  
 
                 alg_params = {
                     "IGNORE_NODATA": True,
-                    "INPUT": layers,
+                    "INPUT": [activity.path],
                     "EXTENT": extent,
                     "OUTPUT_NODATA_VALUE": 0,
                     "REFERENCE_LAYER": reference_layer,
