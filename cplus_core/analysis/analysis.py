@@ -1072,9 +1072,21 @@ class ScenarioAnalysisTask(QgsTask):
 
             output_path = os.path.join(directory, f"{name}_final.tif")
 
-            self.replace_nodata(input_result_path, output_path, nodata_value)
+            if self.replace_nodata(input_result_path, output_path, nodata_value):
+                return output_path
+            else:
+                self.log_message(
+                    f"Problem replacing nodata value in the snapped layer {input_result_path}, "
+                    f"skipping the layer from replacing nodata value."
+                )
+                return input_result_path
+        else:
+            self.log_message(
+                f"Problem snapping layer {input_path}, "
+                f"skipping the layer from replacing nodata value."
+            )
+            return None
 
-        return output_path
 
     def run_activities_analysis(
         self,
