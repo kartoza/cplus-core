@@ -57,7 +57,7 @@ class ScenarioAnalysisTask(QgsTask):
         self.analysis_scenario_name = task_config.scenario.name
         self.analysis_scenario_description = task_config.scenario.description
 
-        self.analysis_activities = task_config.analysis_activities
+        self.analysis_activities: typing.List[Activity] = task_config.analysis_activities
         self.analysis_priority_layers_groups = (
             task_config.priority_layer_groups
         )
@@ -266,10 +266,7 @@ class ScenarioAnalysisTask(QgsTask):
             snapping_enabled
             and reference_layer
         ):
-            self.snap_analysis_data(
-                self.analysis_activities,
-                extent_string,
-            )
+            self.snap_analysis_data(extent_string)
 
         # Weight the pathways using the pathway suitability index
         # and priority group coefficients for the PWLs
@@ -279,7 +276,6 @@ class ScenarioAnalysisTask(QgsTask):
         )
 
         self.run_pathways_weighting(
-            self.analysis_activities,
             self.analysis_priority_layers_groups,
             extent_string,
             temporary_output=not save_output,
@@ -291,7 +287,6 @@ class ScenarioAnalysisTask(QgsTask):
         )
 
         self.run_activities_analysis(
-            self.analysis_activities,
             extent_string,
             temporary_output=not save_output,
         )
@@ -301,17 +296,10 @@ class ScenarioAnalysisTask(QgsTask):
         self.log_message(f"Masking layers: {masking_layers}")
 
         if masking_layers:
-            self.run_activities_masking(
-                self.analysis_activities,
-                masking_layers,
-                extent_string,
-            )
+            self.run_activities_masking(extent_string)
 
         # Run internal masking of the activities layers
-        self.run_internal_activities_masking(
-            self.analysis_activities,
-            extent_string,
-        )
+        self.run_internal_activities_masking(extent_string)
 
         # TODO enable the sieve functionality
         sieve_enabled = self.get_settings_value(
@@ -329,7 +317,6 @@ class ScenarioAnalysisTask(QgsTask):
         )
 
         self.run_activities_cleaning(
-            self.analysis_activities,
             extent_string,
             temporary_output=not save_output
         )
@@ -606,7 +593,6 @@ class ScenarioAnalysisTask(QgsTask):
         
     def run_pathways_weighting(
         self,
-        activities: typing.List[Activity],
         priority_layers_groups: dict,
         extent: str,
         temporary_output: bool = False
@@ -617,9 +603,6 @@ class ScenarioAnalysisTask(QgsTask):
         The formula is: (suitability_index * pathway) +
         (priority group coefficient 1 * PWL 1) +
         (priority group coefficient 2 * PWL 2) ...
-
-        :param activities: List of the selected activities
-        :type activities: typing.List[Activity]
 
         :param priority_layers_groups: Used priority layers groups and their values
         :type priority_layers_groups: dict
@@ -639,7 +622,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         self.set_status_message(tr("Weighting of pathways"))
 
-        if len(activities) == 0:
+        if len(self.analysis_activities) == 0:
             msg = tr("No defined activities for running pathways weighting.")
             self.set_info_message(
                 msg,
@@ -654,7 +637,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         try:
             # Validate activities and corresponding pathways
-            for activity in activities:
+            for activity in self.analysis_activities:
                 if not activity.pathways and (
                     activity.path is None or activity.path == ""
                 ):
@@ -679,7 +662,7 @@ class ScenarioAnalysisTask(QgsTask):
                     activities_paths.append(activity.path)
 
             if not pathways and len(activities_paths) > 0:
-                self.run_activities_analysis(activities, extent)
+                self.run_activities_analysis(self.analysis_activities, extent)
                 return False
 
             suitability_index = float(
@@ -822,13 +805,10 @@ class ScenarioAnalysisTask(QgsTask):
 
         return True
 
-    def snap_analysis_data(self, activities: typing.List[Activity], extent: str):
+    def snap_analysis_data(self, extent: str):
         """Snaps the passed activities pathways, carbon layers and priority
         layers to align with the reference layer set on the settings
         manager.
-
-        :param activities: List of the selected activities
-        :type activities: typing.List[Activity]
 
         :param extent: The selected extent from user
         :type extent: list
@@ -847,7 +827,7 @@ class ScenarioAnalysisTask(QgsTask):
         pathways :typing.List[NcsPathway] = []
 
         try:
-            for activity in activities:
+            for activity in self.analysis_activities:
                 if not activity.pathways and (
                     activity.path is None or activity.path == ""
                 ):
@@ -1036,16 +1016,12 @@ class ScenarioAnalysisTask(QgsTask):
 
     def run_activities_analysis(
         self,
-        activities: typing.List[Activity],
         extent: str,
         temporary_output: bool = False,
     ):
         """Runs the required activity analysis on the passed
         activities pathways. The analysis is responsible for creating
         activities layers from their respective pathways layers.
-
-        :param activities: List of the selected activities
-        :type activities: typing.List[Activity]
 
         :param extent: selected extent from user
         :type extent: SpatialExtent
@@ -1065,7 +1041,7 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr("Creating activity layers from pathways"))
 
         try:
-            for activity in activities:
+            for activity in self.analysis_activities:
                 activities_directory = os.path.join(
                     self.scenario_directory, "activities"
                 )
@@ -1154,21 +1130,16 @@ class ScenarioAnalysisTask(QgsTask):
         return True
 
     def run_activities_masking(
-        self, activities, masking_layers, extent, temporary_output=False
+        self,
+        extent: str, 
+        temporary_output: bool = False
     ):
         """Applies the mask layers into the passed activities
-
-        :param activities: List of the selected activities
-        :type activities: typing.List[Activity]
-
-        :param masking_layers: Paths to the mask layers to be used
-        :type masking_layers: dict
 
         :param extent: selected extent from user
         :type extent: str
 
-        :param temporary_output: Whether to save the processing outputs as temporary
-        files
+        :param temporary_output: Whether to save the processing outputs as temporary files
         :type temporary_output: bool
 
         :returns: Whether the task operations was successful
@@ -1322,12 +1293,11 @@ class ScenarioAnalysisTask(QgsTask):
         return True
 
     def run_internal_activities_masking(
-        self, activities, extent, temporary_output=False
+        self,
+        extent: str,
+        temporary_output: bool = False
     ):
         """Applies the mask layers into the passed activities
-
-        :param activities: List of the selected activities
-        :type activities: typing.List[Activity]
 
         :param extent: selected extent from user
         :type extent: str
@@ -1348,7 +1318,7 @@ class ScenarioAnalysisTask(QgsTask):
         )
 
         try:
-            for activity in activities:
+            for activity in self.analysis_activities:
                 masking_layers = activity.mask_paths
 
                 if len(masking_layers) < 1:
@@ -1842,7 +1812,6 @@ class ScenarioAnalysisTask(QgsTask):
 
     def run_activities_normalization(
             self,
-            activities: typing.List[Activity],
             extent: str,
             temporary_output: bool = False):
         """Runs the normalization analysis on the activities' layers,
@@ -1855,9 +1824,6 @@ class ScenarioAnalysisTask(QgsTask):
         If the carbon coefficient and suitability index are both zero then
         the computation won't take them into account in the normalization
         calculation.
-
-        :param activities: List of the analyzed activities
-        :type activities: typing.List[Activity]
 
         :param extent: Selected area of interest extent
         :type extent: str
@@ -1876,7 +1842,7 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr("Normalization of the activities"))
 
         try:
-            for activity in activities:
+            for activity in self.analysis_activities:
                 if activity.path is None or activity.path == "":
                     if not self.processing_cancelled:
                         self.set_info_message(
@@ -1994,11 +1960,10 @@ class ScenarioAnalysisTask(QgsTask):
         return True
 
     def run_activities_cleaning(
-            self,
-            activities: typing.List[Activity],
-            extent: str,
-            temporary_output: bool = False
-            ):
+        self,
+        extent: str,
+        temporary_output: bool = False
+    ):
         """Cleans the weighted activities replacing
         zero values with no-data as they are not statistical meaningful for the
         scenario analysis.
@@ -2021,7 +1986,7 @@ class ScenarioAnalysisTask(QgsTask):
 
 
         try:
-            for activity in activities:
+            for activity in self.analysis_activities:
                 if activity.path is None or activity.path == "":
                     self.set_info_message(
                         tr(
