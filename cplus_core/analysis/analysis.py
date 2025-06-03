@@ -187,6 +187,41 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr(message))
         self.log_message(message)
 
+    def get_extent_string(
+            self, 
+            reference_path: str,
+            processing_extent: QgsRectangle
+        ) -> str:
+        """Get the extent string for the analysis based on the reference layer
+        and the processing extent.
+        :param reference_path: Path to the reference layer
+        :type reference_path: str
+        :param processing_extent: The extent to be aligned with the reference layer
+        :type processing_extent: QgsRectangle
+        :return: The extent string in the format "xmin,xmax,ymin,ymax [CRS]"
+        :rtype: str
+        """
+        target_layer = QgsRasterLayer(reference_path, "target_layer")
+
+        dest_crs = (
+            target_layer.crs()
+            if target_layer.isValid()
+            else QgsCoordinateReferenceSystem("EPSG:4326")
+        )
+
+        snapped_extent = self.align_extent(target_layer, processing_extent)
+
+        self.log_message(
+            "Snapped area of interest extent " f"{snapped_extent.asWktPolygon()} \n"
+        )
+
+        return (
+            f"{snapped_extent.xMinimum()},{snapped_extent.xMaximum()},"
+            f"{snapped_extent.yMinimum()},{snapped_extent.yMaximum()}"
+            f" [{dest_crs.authid()}]"
+        )
+        
+
     def get_reference_layer(self):
         """Get the path of the reference layer
 
@@ -222,14 +257,6 @@ class ScenarioAnalysisTask(QgsTask):
                     selected_pathway = pathway
                     break
 
-        target_layer = QgsRasterLayer(selected_pathway.path, selected_pathway.name)
-
-        dest_crs = (
-            target_layer.crs()
-            if selected_pathway and selected_pathway.path
-            else QgsCoordinateReferenceSystem("EPSG:4326")
-        )
-
         processing_extent = QgsRectangle(
             float(self.analysis_extent.bbox[0]),
             float(self.analysis_extent.bbox[2]),
@@ -237,25 +264,16 @@ class ScenarioAnalysisTask(QgsTask):
             float(self.analysis_extent.bbox[3]),
         )
 
-        snapped_extent = self.align_extent(target_layer, processing_extent)
-
-        extent_string = (
-            f"{snapped_extent.xMinimum()},{snapped_extent.xMaximum()},"
-            f"{snapped_extent.yMinimum()},{snapped_extent.yMaximum()}"
-            f" [{dest_crs.authid()}]"
+        extent_string = self.get_extent_string(
+            reference_path=selected_pathway.path,
+            processing_extent=processing_extent
         )
 
         self.log_message(
             "Original area of interest extent: "
             f"{processing_extent.asWktPolygon()} \n"
         )
-        self.log_message(
-            "Snapped area of interest extent " f"{snapped_extent.asWktPolygon()} \n"
-        )
 
-        # Normalize the pathways
-        self.run_pathways_normalization()
-        
         # Run pathways layers snapping using a specified reference layer
 
         snapping_enabled = self.get_settings_value(
@@ -266,6 +284,11 @@ class ScenarioAnalysisTask(QgsTask):
             snapping_enabled
             and reference_layer
         ):
+            extent_string = self.get_extent_string(
+                reference_path=reference_layer,
+                processing_extent=processing_extent
+            )
+
             self.snap_analysis_data(extent_string)
 
         # Weight the pathways using the pathway suitability index
