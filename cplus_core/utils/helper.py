@@ -13,6 +13,9 @@ from pathlib import Path
 from uuid import UUID
 from enum import Enum
 
+import numpy as np
+import rasterio
+
 from qgis.PyQt import QtCore
 from qgis.core import (
     QgsCoordinateReferenceSystem,
@@ -107,6 +110,7 @@ def align_rasters(
     output_dir=None,
     rescale_values=False,
     resample_method=0,
+    name="layer"
 ):
     """
     Based from work on https://github.com/inasafe/inasafe/pull/2070
@@ -159,7 +163,7 @@ def align_rasters(
                 int(resample_method))
         except Exception as e:
             logs.append(
-                f"Problem creating a resample value when snapping, {e}")
+                f"Problem creating a resample value when snapping {name}, {e}")
 
         if rescale_values:
             lst[0].rescaleValues = rescale_values
@@ -169,7 +173,7 @@ def align_rasters(
         align.setRasters(lst)
         align.setParametersFromRaster(reference_raster_source)
 
-        layer = QgsRasterLayer(input_raster_source, "input_layer")
+        layer = QgsRasterLayer(reference_raster_source, "reference_raster_source")
 
         extent = transform_extent(
             layer.extent(),
@@ -183,13 +187,13 @@ def align_rasters(
 
         if not align.run():
             logs.append(
-                f"Problem during snapping for {input_raster_source} and "
+                f"Problem during snapping for {name} {input_raster_source} and "
                 f"{reference_raster_source}, {align.errorMessage()}"
             )
             raise Exception(align.errorMessage())
     except Exception as e:
         logs.append(
-            f"Problem occured when snapping, {str(e)}."
+            f"Problem occured when snapping {name}, {str(e)}."
             f" Update snap settings and re-run the analysis"
         )
         logs.append(traceback.format_exc())
@@ -197,7 +201,7 @@ def align_rasters(
         return None, logs
 
     logs.append(
-        f"Finished snapping"
+        f"Finished snapping {name}"
         f" original layer - {input_raster_source},"
         f"snapped output - {input_layer_output} \n"
     )
@@ -324,3 +328,85 @@ def reproject_vector_layer(input_path: str, output_path: str, target_crs: QgsCoo
         print(traceback.format_exc())
         return False
 
+   
+def normalize_raster_layer(
+        input_path,
+        output_directory=None,
+        nodata_value=-9999.0,
+        carbon_coefficient=0.0,
+        suitability_index=0.0
+):
+    """
+    Normalize raster to 0 - 1.
+    :param input_path: Path to input raster file
+    :type input_path: str
+    :param output_directory: Directory to save the output raster, defaults to None
+    :type output_directory: str
+    :param nodata_value: NoData value to assign to the output, defaults to -9999.0
+    :type nodata_value: float
+    :param suitability_index: Suitability index to apply to the raster values, defaults to 0.0
+    :type suitability_index: float
+    :param carbon_coefficient: Carbon coefficient to apply to the raster values, defaults to 0.0
+    :rttype carbon_coefficient: float
+    :return: Path to the output raster file or None if an error occurs
+    :rtype: str
+    """
+    try:
+        if output_directory is None:
+            output_directory = Path(input_path).parent
+        output_path = os.path.join(
+            f"{output_directory}",
+            f"{Path(input_path).stem}_norm_{str(uuid.uuid4())[:4]}.tif"
+        )
+        with rasterio.open(input_path) as src:
+            profile = src.profile.copy()
+            profile.update({
+                'compress': 'deflate',
+                'zlevel': 6,
+                'tiled': True
+            })
+
+            data = src.read()
+            nodata = src.nodata
+
+            if nodata is not None:
+                mask = data != nodata
+            else:
+                mask = np.ones_like(data, dtype=bool)
+            
+            valid = data[mask]
+            min_val = valid.min()
+            max_val = valid.max()
+
+            if min_val == max_val:
+                print(f"Raster has no variation, skipping normalization.")
+                return None
+
+            range_val = max_val - min_val if max_val != min_val else 1.0
+        
+            normalization_index = carbon_coefficient + suitability_index
+
+            norm_data = np.zeros_like(data, dtype=np.float32)
+
+            if normalization_index > 0:
+                norm_data[mask] = normalization_index * (valid - min_val) / range_val
+            else:
+                norm_data[mask] = (valid - min_val) / range_val
+
+            if nodata_value is not None:
+                nodata = nodata_value
+
+            if nodata is not None:
+                norm_data[~mask] = nodata
+                profile['nodata'] = nodata
+
+            with rasterio.open(output_path, 'w', **profile) as dst:
+                dst.write(norm_data)
+
+        print(f"Normalized raster written to: {output_path}")
+        return output_path
+    except Exception as e:
+            print(f"Error thrown when normalizing ratser: {e}")
+            print(traceback.format_exc())
+            return False
+    
