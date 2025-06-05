@@ -594,12 +594,15 @@ class ScenarioAnalysisTask(QgsTask):
                         )
                         continue
                     
-                    if min_value >= 0 and max_value <= 1:
-                        self.log_message(
-                            f"Pathway layer {pathway.name} is already normalized, "
-                            f"skipping the layer from normalization."
-                        )
-                        continue                
+                    if min_value >= 0 and max_value <= 1:                        
+                        new_path = BaseFileUtils.copy_file(pathway.path, normalized_pathways_directory)
+                        if new_path and os.path.exists(new_path):
+                            pathway.path = new_path
+                            self.log_message(
+                                f"Pathway layer {pathway.name} is already normalized (min={min_value}, max={max_value}), "
+                                f"skipping the layer from normalization for pathway {pathway.path}."
+                            )
+                        continue             
                     
                     self.log_message(f"Normalizing {pathway.name} pathway layer \n")
 
