@@ -301,7 +301,10 @@ def normalize_raster_layer(
     :rttype carbon_coefficient: float
     :return: Path to the output raster file or None if an error occurs
     :rtype: str
+    :return: Tuple of (output file path or None, logs)
+    :rtype: tuple
     """
+    logs = []
     try:
         if output_directory is None:
             output_directory = Path(input_path).parent
@@ -330,8 +333,8 @@ def normalize_raster_layer(
             max_val = valid.max()
 
             if min_val == max_val:
-                print(f"Raster has no variation, skipping normalization.")
-                return None
+                logs.append(f"Raster has no variation, skipping normalization.")
+                return None, logs
 
             range_val = max_val - min_val if max_val != min_val else 1.0
         
@@ -354,10 +357,8 @@ def normalize_raster_layer(
             with rasterio.open(output_path, 'w', **profile) as dst:
                 dst.write(norm_data)
 
-        print(f"Normalized raster written to: {output_path}")
-        return output_path
+        return output_path, logs
     except Exception as e:
-            print(f"Error thrown when normalizing ratser: {e}")
-            print(traceback.format_exc())
-            return False
-    
+            logs.append(f"Error thrown when normalizing ratser: {e}")
+            logs.append(traceback.format_exc())
+            return None, logs

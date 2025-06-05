@@ -604,12 +604,20 @@ class ScenarioAnalysisTask(QgsTask):
                     self.log_message(f"Normalizing {pathway.name} pathway layer \n")
 
                     # Pathway normalization
-                    output_path = normalize_raster_layer(
+                    output_path, logs = normalize_raster_layer(
                         input_path=pathway.path,
                         output_directory=normalized_pathways_directory
                     )
                     if output_path:
                         pathway.path = output_path
+                    else:
+                        self.log_message(
+                            f"Problem normalizing pathway layer {pathway.name}, "
+                            f"skipping the layer from normalization."
+                        )
+                        for log in logs:
+                            self.log_message(log, info=("Problem" not in log))
+                        continue
             return True
         except Exception as e:
             self.log_message(f"Problem normalizing pathways, {e} \n")
