@@ -36,7 +36,8 @@ from ..utils.helper import (
     clean_filename,
     tr,
     BaseFileUtils,
-    normalize_raster_layer
+    normalize_raster_layer,
+    replace_nodata_value_from_reference
 )
 from .task_config import TaskConfig
 
@@ -594,22 +595,33 @@ class ScenarioAnalysisTask(QgsTask):
                         )
                         continue
                     
-                    if min_value >= 0 and max_value <= 1:
-                        self.log_message(
-                            f"Pathway layer {pathway.name} is already normalized, "
-                            f"skipping the layer from normalization."
-                        )
-                        continue                
+                    if min_value >= 0 and max_value <= 1:                        
+                        new_path = BaseFileUtils.copy_file(pathway.path, normalized_pathways_directory)
+                        if new_path and os.path.exists(new_path):
+                            pathway.path = new_path
+                            self.log_message(
+                                f"Pathway layer {pathway.name} is already normalized (min={min_value}, max={max_value}), "
+                                f"skipping the layer from normalization for pathway {pathway.path}."
+                            )
+                        continue             
                     
                     self.log_message(f"Normalizing {pathway.name} pathway layer \n")
 
                     # Pathway normalization
-                    output_path = normalize_raster_layer(
+                    output_path, logs = normalize_raster_layer(
                         input_path=pathway.path,
                         output_directory=normalized_pathways_directory
                     )
                     if output_path:
                         pathway.path = output_path
+                    else:
+                        self.log_message(
+                            f"Problem normalizing pathway layer {pathway.name}, "
+                            f"skipping the layer from normalization."
+                        )
+                        for log in logs:
+                            self.log_message(log, info=("Problem" not in log))
+                        continue
             return True
         except Exception as e:
             self.log_message(f"Problem normalizing pathways, {e} \n")
@@ -1061,8 +1073,6 @@ class ScenarioAnalysisTask(QgsTask):
         )
         for log in logs:
             self.log_message(log, info=("Problem" not in log))
-        
-        output_path = input_path
 
         if input_result_path is not None:
             result_path = Path(input_result_path)
@@ -1072,9 +1082,17 @@ class ScenarioAnalysisTask(QgsTask):
 
             output_path = os.path.join(directory, f"{name}_final.tif")
 
-            if self.replace_nodata(input_result_path, output_path, nodata_value):
+            ok, logs = replace_nodata_value_from_reference(
+                source_path=input_result_path,
+                reference_path=reference_path, 
+                output_path=output_path,
+            )
+
+            if ok:
                 return output_path
             else:
+                for log in logs:
+                    self.log_message(log, info=("Problem" not in log))
                 self.log_message(
                     f"Problem replacing nodata value in the snapped layer {input_result_path}, "
                     f"skipping the layer from replacing nodata value."

@@ -12,6 +12,10 @@ import datetime
 from pathlib import Path
 from uuid import UUID
 from enum import Enum
+import shutil
+
+import numpy as np
+import rasterio
 
 import numpy as np
 import rasterio
@@ -21,9 +25,7 @@ from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsProject,
-    QgsRasterLayer,
-    QgsVectorLayer,
-    QgsVectorFileWriter
+    QgsRasterLayer
 )
 
 from qgis.analysis import QgsAlignRaster
@@ -101,6 +103,23 @@ class BaseFileUtils:
 
         if not p.exists():
             p.touch(exist_ok=True)
+
+    @staticmethod
+    def copy_file(file_path: str, target_dir: str, log_message: str = ""):
+        """Copies file to the target directory"""
+        p = Path(file_path)
+        if not p.exists():
+            raise FileNotFoundError(f"File {file_path} does not exist")
+
+        target_path = Path(target_dir) / p.name
+        if not target_path.parent.exists():
+            target_path.parent.mkdir(parents=True)
+
+        shutil.copy(p, target_path)
+        if not target_path.exists():
+            raise FileNotFoundError(f"Failed to copy file to {target_dir}")
+        return str(target_path)
+        
 
 
 def align_rasters(
@@ -280,55 +299,6 @@ def unique_path_from_reference(reference_path: str) -> str:
     new_filename = f"{name}_{uuid.uuid4().hex}{ext}"
     return os.path.join(directory, new_filename)
 
-def reproject_vector_layer(input_path: str, output_path: str, target_crs: QgsCoordinateReferenceSystem) -> bool:
-    """Reprojects a vector layer to a new CRS
-
-    :param input_path: Path to the input vector layer.
-    :param output_path: Path to save the reprojected layer.
-    :param target_crs: Te target CRS.
-    :returns: True if successful, False otherwise.
-    """
-    try:
-        # Load the input vector layer
-        layer = QgsVectorLayer(input_path, "input_layer", "ogr")
-        if not layer.isValid():
-            return False
-
-        # Extract original driver name and encoding
-        provider = layer.dataProvider()
-        original_driver = provider.storageType() or "ESRI Shapefile"
-        original_encoding = provider.encoding() or "UTF-8"
-
-        # Set save options
-        context = QgsProject.instance().transformContext()
-
-        options = QgsVectorFileWriter.SaveVectorOptions()
-        options.driverName = original_driver
-        options.fileEncoding = original_encoding
-        options.ct = QgsCoordinateTransform(layer.crs(), target_crs, QgsProject.instance())
-
-        # Write reprojected layer
-        result = QgsVectorFileWriter.writeAsVectorFormatV3(
-            layer=layer,
-            fileName=output_path,
-            transformContext=context,
-            options=options
-        )
-
-        error_code = result[0]
-        error_message = result[1]
-
-        if error_code == QgsVectorFileWriter.NoError:
-            return True
-        else:
-            print(f"Error saving layer: {error_message}")
-            return False
-    except Exception as e:
-        print(f"Error thrown saving layer: {e}")
-        print(traceback.format_exc())
-        return False
-
-   
 def normalize_raster_layer(
         input_path,
         output_directory=None,
@@ -350,7 +320,10 @@ def normalize_raster_layer(
     :rttype carbon_coefficient: float
     :return: Path to the output raster file or None if an error occurs
     :rtype: str
+    :return: Tuple of (output file path or None, logs)
+    :rtype: tuple
     """
+    logs = []
     try:
         if output_directory is None:
             output_directory = Path(input_path).parent
@@ -379,8 +352,8 @@ def normalize_raster_layer(
             max_val = valid.max()
 
             if min_val == max_val:
-                print(f"Raster has no variation, skipping normalization.")
-                return None
+                logs.append(f"Raster has no variation, skipping normalization.")
+                return None, logs
 
             range_val = max_val - min_val if max_val != min_val else 1.0
         
@@ -403,10 +376,65 @@ def normalize_raster_layer(
             with rasterio.open(output_path, 'w', **profile) as dst:
                 dst.write(norm_data)
 
-        print(f"Normalized raster written to: {output_path}")
-        return output_path
+        return output_path, logs
     except Exception as e:
-            print(f"Error thrown when normalizing ratser: {e}")
-            print(traceback.format_exc())
-            return False
+            logs.append(f"Error thrown when normalizing ratser: {e}")
+            logs.append(traceback.format_exc())
+            return None, logs
     
+def replace_nodata_value_from_reference(
+        source_path,
+        reference_path=None,
+        output_path=None
+):
+    """
+    Replace NoData value in raster with a specified value.
+    
+    :param source_path: Path to input raster file
+    :type source_path: str
+    :param reference_path: Path to reference raster file, not used in this function
+    :type reference_path: str
+    :param output_path: Path to save the output raster, defaults to None
+    :type output_path: str
+    :return: Tuple of (success, logs)
+    :rtype: tuple
+    """
+    logs = []
+    try:
+        if output_path is None:
+            output_path = os.path.join(
+                f"{Path(source_path).parent}",
+                f"{Path(source_path).stem}_nodata_{str(uuid.uuid4())[:4]}.tif"
+            )
+        with rasterio.open(source_path) as src:
+            profile = src.profile.copy()
+            src_data = src.read()
+
+            with rasterio.open(reference_path) as ref_src:
+                ref_nodata = ref_src.nodata
+                profile.update({
+                    'compress': 'deflate',
+                    'zlevel': 6,
+                    'tiled': True,
+                    'nodata': ref_nodata
+                })
+                ref_data = ref_src.read()
+            
+                if ref_nodata is not None and src_data.shape == ref_data.shape:
+                    # If reference raster has a nodata value, use it to mask the source data
+                    mask = ref_data != ref_nodata
+                    src_data[~mask] = ref_nodata
+                else:
+                    logs.append(
+                        f"No nodata value found in reference raster or shapes do not match."
+                        f"Shapes= {src_data.shape} and {ref_data.shape}."
+                    )                 
+                    return False, logs
+
+            with rasterio.open(output_path, 'w', **profile) as dst:
+                dst.write(src_data)
+        return True, logs
+    except Exception as e:
+        logs.append(f"Error thrown when replacing NoData value: {e}")
+        logs.append(traceback.format_exc())
+        return False, logs
