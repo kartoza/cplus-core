@@ -36,7 +36,8 @@ from ..utils.helper import (
     clean_filename,
     tr,
     BaseFileUtils,
-    normalize_raster_layer
+    normalize_raster_layer,
+    replace_nodata_value_from_reference
 )
 from .task_config import TaskConfig
 
@@ -1072,8 +1073,6 @@ class ScenarioAnalysisTask(QgsTask):
         )
         for log in logs:
             self.log_message(log, info=("Problem" not in log))
-        
-        output_path = input_path
 
         if input_result_path is not None:
             result_path = Path(input_result_path)
@@ -1083,9 +1082,17 @@ class ScenarioAnalysisTask(QgsTask):
 
             output_path = os.path.join(directory, f"{name}_final.tif")
 
-            if self.replace_nodata(input_result_path, output_path, nodata_value):
+            ok, logs = replace_nodata_value_from_reference(
+                source_path=input_result_path,
+                reference_path=reference_path, 
+                output_path=output_path,
+            )
+
+            if ok:
                 return output_path
             else:
+                for log in logs:
+                    self.log_message(log, info=("Problem" not in log))
                 self.log_message(
                     f"Problem replacing nodata value in the snapped layer {input_result_path}, "
                     f"skipping the layer from replacing nodata value."
