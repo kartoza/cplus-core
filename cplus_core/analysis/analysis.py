@@ -1244,6 +1244,10 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr("Masking activities using the saved masked layers"))
 
         try:
+            masked_activities_directory = os.path.join(
+                self.scenario_directory, "masked_activities"
+            )
+            BaseFileUtils.create_new_dir(masked_activities_directory)
             for activity in self.analysis_activities:
                 if activity.path is None or activity.path == "":
                     if not self.processing_cancelled:
@@ -1274,10 +1278,11 @@ class ScenarioAnalysisTask(QgsTask):
                     continue
 
                 if len(masking_layers) > 1:
-                    initial_mask_layer = self.merge_vector_layers(masking_layers)
+                    mask_layer_path = self.merge_vector_layers(masking_layers)
                 else:
                     mask_layer_path = masking_layers[0]
-                    initial_mask_layer = QgsVectorLayer(mask_layer_path, "mask", "ogr")
+
+                initial_mask_layer = QgsVectorLayer(mask_layer_path, "mask", "ogr")
 
                 if not initial_mask_layer.isValid():
                     self.log_message(
@@ -1334,12 +1339,6 @@ class ScenarioAnalysisTask(QgsTask):
                     )
                     return False
                 
-                if extent_layer.crs() != mask_layer.crs():
-                    self.log_message(
-                        f"Skipping masking, the mask layers crs ({mask_layer.crs().authid()})"
-                        f" do not match the scenario crs ({extent_layer.crs().authid()})."
-                    )
-                    return False
 
                 if not extent_layer.extent().intersects(mask_layer.extent()):
                     self.log_message(
@@ -1348,10 +1347,7 @@ class ScenarioAnalysisTask(QgsTask):
                     )
                     return False
 
-                masked_activities_directory = os.path.join(
-                    self.scenario_directory, "masked_activities"
-                )
-                BaseFileUtils.create_new_dir(masked_activities_directory)
+                
                 file_name = clean_filename(activity.name.replace(" ", "_"))
 
                 output_file = os.path.join(
@@ -1428,6 +1424,11 @@ class ScenarioAnalysisTask(QgsTask):
         )
 
         try:
+            masked_activities_directory = os.path.join(
+                self.scenario_directory, "final_masked_activities"
+            )
+            BaseFileUtils.create_new_dir(masked_activities_directory)
+            
             for activity in self.analysis_activities:
                 masking_layers = activity.mask_paths
 
@@ -1438,10 +1439,10 @@ class ScenarioAnalysisTask(QgsTask):
                     )
                     continue
                 if len(masking_layers) > 1:
-                    initial_mask_layer = self.merge_vector_layers(masking_layers)
+                    mask_layer_path = self.merge_vector_layers(masking_layers)
                 else:
                     mask_layer_path = masking_layers[0]
-                    initial_mask_layer = QgsVectorLayer(mask_layer_path, "mask", "ogr")
+                initial_mask_layer = QgsVectorLayer(mask_layer_path, "mask", "ogr")
 
                 if not initial_mask_layer.isValid():
                     self.log_message(
@@ -1528,10 +1529,6 @@ class ScenarioAnalysisTask(QgsTask):
 
                     continue
 
-                masked_activities_directory = os.path.join(
-                    self.scenario_directory, "final_masked_activities"
-                )
-                BaseFileUtils.create_new_dir(masked_activities_directory)
                 file_name = clean_filename(activity.name.replace(" ", "_"))
 
                 output_file = os.path.join(
