@@ -17,6 +17,9 @@ import shutil
 import numpy as np
 import rasterio
 
+import numpy as np
+import rasterio
+
 from qgis.PyQt import QtCore
 from qgis.core import (
     QgsCoordinateReferenceSystem,
