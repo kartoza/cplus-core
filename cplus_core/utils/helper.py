@@ -12,6 +12,7 @@ import datetime
 from pathlib import Path
 from uuid import UUID
 from enum import Enum
+import shutil
 
 import numpy as np
 import rasterio
@@ -101,6 +102,23 @@ class BaseFileUtils:
 
         if not p.exists():
             p.touch(exist_ok=True)
+
+    @staticmethod
+    def copy_file(file_path: str, target_dir: str, log_message: str = ""):
+        """Copies file to the target directory"""
+        p = Path(file_path)
+        if not p.exists():
+            raise FileNotFoundError(f"File {file_path} does not exist")
+
+        target_path = Path(target_dir) / p.name
+        if not target_path.parent.exists():
+            target_path.parent.mkdir(parents=True)
+
+        shutil.copy(p, target_path)
+        if not target_path.exists():
+            raise FileNotFoundError(f"Failed to copy file to {target_dir}")
+        return str(target_path)
+        
 
 
 def align_rasters(
