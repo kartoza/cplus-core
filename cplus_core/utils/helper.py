@@ -22,9 +22,7 @@ from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsProject,
-    QgsRasterLayer,
-    QgsVectorLayer,
-    QgsVectorFileWriter
+    QgsRasterLayer
 )
 
 from qgis.analysis import QgsAlignRaster
