@@ -280,55 +280,6 @@ def unique_path_from_reference(reference_path: str) -> str:
     new_filename = f"{name}_{uuid.uuid4().hex}{ext}"
     return os.path.join(directory, new_filename)
 
-def reproject_vector_layer(input_path: str, output_path: str, target_crs: QgsCoordinateReferenceSystem) -> bool:
-    """Reprojects a vector layer to a new CRS
-
-    :param input_path: Path to the input vector layer.
-    :param output_path: Path to save the reprojected layer.
-    :param target_crs: Te target CRS.
-    :returns: True if successful, False otherwise.
-    """
-    try:
-        # Load the input vector layer
-        layer = QgsVectorLayer(input_path, "input_layer", "ogr")
-        if not layer.isValid():
-            return False
-
-        # Extract original driver name and encoding
-        provider = layer.dataProvider()
-        original_driver = provider.storageType() or "ESRI Shapefile"
-        original_encoding = provider.encoding() or "UTF-8"
-
-        # Set save options
-        context = QgsProject.instance().transformContext()
-
-        options = QgsVectorFileWriter.SaveVectorOptions()
-        options.driverName = original_driver
-        options.fileEncoding = original_encoding
-        options.ct = QgsCoordinateTransform(layer.crs(), target_crs, QgsProject.instance())
-
-        # Write reprojected layer
-        result = QgsVectorFileWriter.writeAsVectorFormatV3(
-            layer=layer,
-            fileName=output_path,
-            transformContext=context,
-            options=options
-        )
-
-        error_code = result[0]
-        error_message = result[1]
-
-        if error_code == QgsVectorFileWriter.NoError:
-            return True
-        else:
-            print(f"Error saving layer: {error_message}")
-            return False
-    except Exception as e:
-        print(f"Error thrown saving layer: {e}")
-        print(traceback.format_exc())
-        return False
-
-   
 def normalize_raster_layer(
         input_path,
         output_directory=None,
