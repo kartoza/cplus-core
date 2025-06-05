@@ -1305,6 +1305,22 @@ class ScenarioAnalysisTask(QgsTask):
                     return False
 
                 extent_layer = self.layer_extent(extent)
+
+                if extent_layer.crs() != initial_mask_layer.crs():                    
+                    reprojected_mask_path = self.reproject_mask_layer(
+                        input_path=mask_layer_path,
+                        output_directory=masked_activities_directory,
+                        target_crs=extent_layer.crs()
+                    )
+                    if reprojected_mask_path is not None:
+                        initial_mask_layer = QgsVectorLayer(reprojected_mask_path, "ogr")
+                    else:
+                        self.log_message(
+                            f"Skipping masking, the mask layers crs ({mask_layer.crs().authid()})"
+                            f" do not match the scenario crs ({extent_layer.crs().authid()})."
+                        )
+                        return False
+                    
                 mask_layer = self.mask_layer_difference(initial_mask_layer, extent_layer)
 
                 if isinstance(mask_layer, str):
@@ -1454,11 +1470,19 @@ class ScenarioAnalysisTask(QgsTask):
                 extent_layer = self.layer_extent(extent)
 
                 if extent_layer.crs() != initial_mask_layer.crs():
-                    self.log_message(
-                        f"Skipping masking, the mask layers crs ({initial_mask_layer.crs().authid()})"
-                        f" do not match the scenario crs ({extent_layer.crs().authid()})."
+                    reprojected_mask = self.reproject_mask_layer(
+                        input_path=mask_layer_path,
+                        output_directory=masked_activities_directory,
+                        target_crs=extent_layer.crs()
                     )
-                    continue
+                    if reprojected_mask is not None:
+                        initial_mask_layer = QgsVectorLayer(reprojected_mask, "ogr")
+                    else:                        
+                        self.log_message(
+                            f"Skipping masking, the mask layers crs ({initial_mask_layer.crs().authid()})"
+                            f" do not match the scenario crs ({extent_layer.crs().authid()})."
+                        )
+                        continue
 
                 if not extent_layer.extent().intersects(initial_mask_layer.extent()):
                     self.log_message(
@@ -1668,6 +1692,44 @@ class ScenarioAnalysisTask(QgsTask):
             feedback=self.feedback,
         )
 
+        return results["OUTPUT"]
+    
+    def reproject_mask_layer(
+            self, 
+            input_path: str, 
+            output_directory: str, 
+            target_crs: QgsCoordinateReferenceSystem
+        ):
+        """Reprojects the input layer to the target CRS and saves it to the output path.
+        :param input_path: Input layer path
+        :type input_path: str
+        :param output_directory: Output directory path
+        :type output_directory: str
+        :param target_crs: Target CRS to reproject to
+        :type target_crs: QgsCoordinateReferenceSystem
+        :returns: Reprojected layer path
+        :rtype: str
+        """
+        if output_directory is None:
+            output_directory = Path(input_path).parent
+        output_path = os.path.join(
+            f"{output_directory}",
+            f"{Path(input_path).stem}_reprojected_{str(uuid.uuid4())[:4]}.tif"
+        )
+
+        alg_params = {
+            'INPUT': input_path,
+            'TARGET_CRS': target_crs,
+            'CONVERT_CURVED_GEOMETRIES': False,
+            'OPERATION': None,
+            'OUTPUT': output_path
+        }
+        results = processing.run(
+            "native:reprojectlayer", 
+            alg_params,
+            context=self.processing_context,
+            feedback=self.feedback,
+        )
         return results["OUTPUT"]
 
     def run_activities_sieve(self, models, temporary_output=False):
