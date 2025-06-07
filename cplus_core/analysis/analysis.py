@@ -191,7 +191,8 @@ class ScenarioAnalysisTask(QgsTask):
     def get_extent_string(
             self, 
             reference_path: str,
-            processing_extent: QgsRectangle
+            processing_extent: QgsRectangle,
+            align_with_processing_extent: bool = True
         ) -> str:
         """Get the extent string for the analysis based on the reference layer
         and the processing extent.
@@ -200,6 +201,9 @@ class ScenarioAnalysisTask(QgsTask):
         :param processing_extent: The extent to be aligned with the reference layer
         :type processing_extent: QgsRectangle
         :return: The extent string in the format "xmin,xmax,ymin,ymax [CRS]"
+        :param align_with_processing_extent: Whether to align the extent with the
+        processing extent, defaults to True
+        :type align_with_processing_extent: bool
         :rtype: str
         """
         target_layer = QgsRasterLayer(reference_path, "target_layer")
@@ -210,7 +214,10 @@ class ScenarioAnalysisTask(QgsTask):
             else QgsCoordinateReferenceSystem("EPSG:4326")
         )
 
-        snapped_extent = self.align_extent(target_layer, processing_extent)
+        if align_with_processing_extent:            
+            snapped_extent = self.align_extent(target_layer, processing_extent)
+        else:
+            snapped_extent = target_layer.extent()
 
         self.log_message(
             "Snapped area of interest extent " f"{snapped_extent.asWktPolygon()} \n"
@@ -287,9 +294,9 @@ class ScenarioAnalysisTask(QgsTask):
         ):
             extent_string = self.get_extent_string(
                 reference_path=reference_layer,
-                processing_extent=processing_extent
+                processing_extent=processing_extent,
+                align_with_processing_extent=False
             )
-
             self.snap_analysis_data(extent_string)
         
         # Normalize the pathways
