@@ -26,7 +26,7 @@ setup(
     packages=find_packages(exclude=[
         "tests", "tests.*", "docker-compose.yml",
         "test_suite.py", "scripts", "scripts.*",
-        "run-tests.sh"
+        "run-tests.sh", "tests_directory"
     ]),
     package_data={"cplus_core": ["version.json", "data/**"]},
     include_package_data=True,
