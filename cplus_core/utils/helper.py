@@ -94,7 +94,7 @@ class BaseFileUtils:
         """Creates new file directory if it doesn't exist"""
         p = Path(directory)
         if not p.exists():
-            p.mkdir()
+            p.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def create_new_file(file_path: str, log_message: str = ""):
