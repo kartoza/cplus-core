@@ -239,6 +239,10 @@ class ScenarioAnalysisTask(QgsTask):
         snapping_enabled = self.get_settings_value(
             Settings.SNAPPING_ENABLED, default=False, setting_type=bool
         )
+        if snapping_enabled is False:
+            self.log_message("Snapping is disabled, no reference layer will be used.")
+            return None
+        
         reference_layer = self.get_settings_value(Settings.SNAP_LAYER, default="")
         reference_layer_path = Path(reference_layer)
         if (
