@@ -67,6 +67,10 @@ jobs:
           docker compose up -d
           sleep 10
 
+      - name: Install dependencies in QGIS container
+        run: |
+          docker-compose exec -T qgis-testing-environment sh -c "pip3 install rasterio"
+
       - name: Run test suite
         run: |
           docker compose exec -T qgis-testing-environment qgis_testrunner.sh test_suite.test_package
