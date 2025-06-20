@@ -94,7 +94,7 @@ class BaseFileUtils:
         """Creates new file directory if it doesn't exist"""
         p = Path(directory)
         if not p.exists():
-            p.mkdir()
+            p.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def create_new_file(file_path: str, log_message: str = ""):
@@ -119,8 +119,24 @@ class BaseFileUtils:
         if not target_path.exists():
             raise FileNotFoundError(f"Failed to copy file to {target_dir}")
         return str(target_path)
+    
+    @staticmethod
+    def remove_dir(directory: str):
+        """Removes the directory and all its contents"""
+        p = Path(directory)
+        if p.exists() and p.is_dir():
+            shutil.rmtree(p)
+            return True
+        return False
+    
+    def remove_file(file_path: str):
+        """Removes the file if it exists"""
+        p = Path(file_path)
+        if p.exists() and p.is_file():
+            p.unlink()
+            return True
+        return False
         
-
 
 def align_rasters(
     input_raster_source,

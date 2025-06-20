@@ -239,6 +239,10 @@ class ScenarioAnalysisTask(QgsTask):
         snapping_enabled = self.get_settings_value(
             Settings.SNAPPING_ENABLED, default=False, setting_type=bool
         )
+        if snapping_enabled is False:
+            self.log_message("Snapping is disabled, no reference layer will be used.")
+            return None
+        
         reference_layer = self.get_settings_value(Settings.SNAP_LAYER, default="")
         reference_layer_path = Path(reference_layer)
         if (
@@ -1082,9 +1086,10 @@ class ScenarioAnalysisTask(QgsTask):
             self.log_message(log, info=("Problem" not in log))
 
         if input_result_path is not None:
-            result_path = Path(input_result_path)
+            directory = os.path.join(self.scenario_directory, "snapped_layers")
+            input_result_path = BaseFileUtils.copy_file(input_result_path, directory)
 
-            directory = result_path.parent
+            result_path = Path(input_result_path)
             name = result_path.stem
 
             output_path = os.path.join(directory, f"{name}_final.tif")
@@ -1111,7 +1116,6 @@ class ScenarioAnalysisTask(QgsTask):
                 f"skipping the layer from replacing nodata value."
             )
             return None
-
 
     def run_activities_analysis(
         self,
@@ -1220,7 +1224,6 @@ class ScenarioAnalysisTask(QgsTask):
                     feedback=self.feedback,
                 )
                 activity.path = results["OUTPUT"]
-
         except Exception as e:
             self.log_message(f"Problem creating activity layers, {e}")
             self.cancel_task(e)
@@ -2172,7 +2175,7 @@ class ScenarioAnalysisTask(QgsTask):
                 file_name = clean_filename(activity.name.replace(" ", "_"))
 
                 weighted_pathways_dir = os.path.join(
-                    self.scenario_directory, "weighted_pathways"
+                    self.scenario_directory, "weighted_activities"
                 )
 
                 BaseFileUtils.create_new_dir(weighted_pathways_dir)
