@@ -69,7 +69,7 @@ jobs:
 
       - name: Install dependencies in QGIS container
         run: |
-          docker-compose exec -T qgis-testing-environment sh -c "pip3 install rasterio"
+          docker compose exec -T qgis-testing-environment sh -c "pip3 install rasterio"
 
       - name: Run test suite
         run: |
