@@ -30,6 +30,18 @@ CPLUS Core is the core module for [CPLUS plugin](https://github.com/Conservation
     self.analysis_task.run()
 ```
 
+### 🔧 Testing
+
+To run cplus-core tests use the below script from the root directory.
+```
+   ./run-tests.sh
+```
+
+The script spins up Docker containers that contain QGIS version 3.26 and latest version images respectively, finally it runs the available test suite. Python is required to
+be installed in the system before using the script.
+
+When using the script for the first time it will pull the QGIS Docker images if there are not available 
+locally. After the tests have finished running the Docker containers created for the tests will be stopped and removed.
 
 ### 📃 Documentation
 
