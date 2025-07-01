@@ -482,5 +482,78 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
 
         self.assertTrue(result)
 
+    def test_reprojection(self):
+        """Test the layer reprojection functionality."""
+        pathways_directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "pathways", "layers"
+        )
+
+        pathway_layer_path_1 = os.path.join(
+            pathways_directory, "test_pathway_1.tif"
+        )
+
+        test_layer = QgsRasterLayer(pathway_layer_path_1, "test__layer")
+
+        self.assertTrue(test_layer.isValid())
+
+        extent = test_layer.extent()
+
+        spatial_extent = SpatialExtent(
+            bbox=[extent.xMinimum(), extent.xMaximum(), extent.yMinimum(), extent.yMaximum()],
+            crs=test_layer.crs().authid()
+        )
+
+        scenario = Scenario(
+            uuid=uuid.uuid4(),
+            name="Scenario",
+            description="Scenario description",
+            activities=[],
+            extent=spatial_extent,
+            priority_layer_groups=[],
+            weighted_activities=[]
+        )
+
+        task_config = TaskConfig(
+            scenario=scenario,
+            priority_layers=priority_layers,
+            priority_layer_groups=test_priority_groups,
+            analysis_activities=scenario.activities,
+            all_activities=[],
+            snapping_enabled=True,
+            snap_layer=snapping_layer,
+            mask_layers_paths=",".join(mask_layers_paths),
+            snap_rescale=True,
+            snap_method=0,
+            pathway_suitability_index=0.0,
+            carbon_coefficient=1.0,
+            sieve_enabled=False,
+            sieve_threshold=10.0,
+            ncs_with_carbon=True,
+            landuse_project=True,
+            landuse_normalized=True,
+            landuse_weighted=True,
+            highest_position=True,
+            base_dir=os.path.dirname(os.path.abspath(__file__)),
+        )
+
+        analysis_task = ScenarioAnalysisTask(
+            task_config=task_config,
+        )
+
+        result = analysis_task.reproject_layer(
+            input_path=pathway_layer_path_1,
+            target_crs="EPSG:3857"
+        )
+
+        self.assertTrue(result)
+        self.assertTrue(os.path.exists(result))        
+        if os.path.exists(result):
+            raster = QgsRasterLayer(result, "reprojected_layer")
+            self.assertTrue(raster.isValid())
+            self.assertEqual(raster.crs().authid(), "EPSG:3857")
+            self.assertNotEqual(raster.extent(), test_layer.extent())
+            os.remove(result)
+        
+
     def tearDown(self):
         pass
