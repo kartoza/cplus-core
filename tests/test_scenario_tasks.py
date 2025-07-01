@@ -16,7 +16,7 @@ from qgis.core import Qgis, QgsRasterLayer, QgsRectangle
 
 from cplus_core.analysis.analysis import ScenarioAnalysisTask
 from cplus_core.analysis.task_config import TaskConfig
-from cplus_core.models.base import Scenario, NcsPathway, Activity
+from cplus_core.models.base import Scenario, NcsPathway, Activity, SpatialExtent
 from cplus_core.utils.helper import BaseFileUtils
 
 pathway_layer_directory = os.path.join(
@@ -85,6 +85,11 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             f" [{test_layer.crs().authid()}]"
         )
 
+        spatial_extent = SpatialExtent(
+            bbox=[test_extent.xMinimum(), test_extent.xMaximum(), test_extent.yMinimum(), test_extent.yMaximum()],
+            crs=test_layer.crs().authid()
+        )
+
         test_activity = Activity(
             uuid=uuid.uuid4(),
             name="test_activity",
@@ -97,7 +102,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             name="Scenario",
             description="Scenario description",
             activities=[test_activity],
-            extent=test_extent,
+            extent=spatial_extent,
             priority_layer_groups=test_priority_groups,
             weighted_activities=[],
         )
@@ -209,12 +214,17 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             pathways=[first_test_pathway, second_test_pathway],
         )
 
+        spatial_extent = SpatialExtent(
+            bbox=[test_extent.xMinimum(), test_extent.xMaximum(), test_extent.yMinimum(), test_extent.yMaximum()],
+            crs=first_test_layer.crs().authid()
+        )
+
         scenario = Scenario(
             uuid=uuid.uuid4(),
             name="Scenario",
             description="Scenario description",
             activities=[test_activity],
-            extent=test_extent,
+            extent=spatial_extent,
             priority_layer_groups=[],
             weighted_activities=[]
         )
@@ -319,12 +329,17 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
 
         test_extent = activity_layer.extent()
 
+        spatial_extent = SpatialExtent(
+            bbox=[test_extent.xMinimum(), test_extent.xMaximum(), test_extent.yMinimum(), test_extent.yMaximum()],
+            crs=activity_layer.crs().authid()
+        )
+
         scenario = Scenario(
             uuid=uuid.uuid4(),
             name="Scenario",
             description="Scenario description",
             activities=[test_activity],
-            extent=test_extent,
+            extent=spatial_extent,
             priority_layer_groups=[],
             weighted_activities=[]
         )
@@ -439,12 +454,17 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             f" [{test_layer.crs().authid()}]"
         )
 
+        spatial_extent = SpatialExtent(
+            bbox=[extent.xMinimum(), extent.xMaximum(), extent.yMinimum(), extent.yMaximum()],
+            crs=test_layer.crs().authid()
+        )
+
         scenario = Scenario(
             uuid=uuid.uuid4(),
             name="Scenario",
             description="Scenario description",
             activities=[test_activity],
-            extent=extent_string,
+            extent=spatial_extent,
             priority_layer_groups=[],
             weighted_activities=[]
         )
