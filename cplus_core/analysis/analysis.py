@@ -28,7 +28,7 @@ from qgis.core import (
 
 from ..utils.conf import Settings
 from ..definitions.defaults import (
-    SCENARIO_OUTPUT_FILE_NAME,
+    SCENARIO_OUTPUT_FILE_NAME, DEFAULT_VALUES
 )
 from ..models.base import ScenarioResult, Activity, NcsPathway
 from ..utils.helper import (

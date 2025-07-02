@@ -39,6 +39,7 @@ class TaskConfig(object):
     landuse_weighted = DEFAULT_VALUES.landuse_weighted
     highest_position = DEFAULT_VALUES.highest_position
     base_dir = ""
+    nodata_value = DEFAULT_VALUES.nodata_value
 
     def __init__(
         self,
@@ -62,6 +63,7 @@ class TaskConfig(object):
         landuse_weighted=DEFAULT_VALUES.landuse_weighted,
         highest_position=DEFAULT_VALUES.highest_position,
         base_dir="",
+        nodata_value=DEFAULT_VALUES.nodata_value,
     ) -> None:
         """Initialize analysis task configuration.
 
@@ -125,6 +127,9 @@ class TaskConfig(object):
 
         :param base_dir: base scenario directory, defaults to ""
         :type base_dir: str, optional
+        :param nodata_value: No data value for raster layers,
+            defaults to DEFAULT_VALUES.nodata_value
+        :type nodata_value: float, optional
         """
         self.scenario = scenario
         self.priority_layers = priority_layers
@@ -151,6 +156,8 @@ class TaskConfig(object):
         self.highest_position = highest_position
 
         self.base_dir = base_dir
+
+        self.nodata_value = nodata_value
 
     def get_activity(
             self, activity_uuid: str) -> typing.Union[Activity, None]:
@@ -239,6 +246,7 @@ class TaskConfig(object):
             "landuse_weighted": self.landuse_weighted,
             "highest_position": self.highest_position,
             "base_dir": self.base_dir,
+            "nodata_value": self.nodata_value,
         }
         for activity in self.scenario.activities:
             activity_dict = {

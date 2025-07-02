@@ -650,6 +650,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             landuse_weighted=True,
             highest_position=True,
             base_dir=base_dir,
+            nodata_value=-9999.0,  # Set the nodata value to replace
         )
 
         analysis_task = ScenarioAnalysisTask(
@@ -665,7 +666,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
         analysis_task.scenario_directory = scenario_directory
 
         result = analysis_task.run_pathways_replace_nodata(
-            nodata_value=-9999.0,
+            nodata_value=task_config.nodata_value,
         )
 
         self.assertTrue(result)
@@ -675,7 +676,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
         result_layer = QgsRasterLayer(test_pathway.path, test_pathway.name)
         result_provider = result_layer.dataProvider()
         result_no_data_value = result_provider.sourceNoDataValue(1)
-        self.assertEqual(result_no_data_value, -9999.0)   
+        self.assertEqual(result_no_data_value, task_config.nodata_value)   
         self.assertTrue(BaseFileUtils.remove_dir(scenario_directory))
         
     def tearDown(self):

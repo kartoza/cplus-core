@@ -32,7 +32,7 @@ class Settings(enum.Enum):
     SNAP_PIXEL_VALUE = "snap_pixel_value"
 
     # Nodata value
-    NCS_NO_DATA_VALUE = "ncs_no_data_value"
+    NCS_NO_DATA_VALUE = "nodata_value"
 
     # Sieve function parameters
     SIEVE_ENABLED = "sieve_enabled"
