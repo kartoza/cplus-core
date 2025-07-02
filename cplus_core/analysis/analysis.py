@@ -322,7 +322,9 @@ class ScenarioAnalysisTask(QgsTask):
         # Replace no data value for the pathways and priority layers
         nodata_value = float(
             self.get_settings_value(
-                Settings.NCS_NO_DATA_VALUE, default=-9999.0, setting_type=float
+                Settings.NCS_NO_DATA_VALUE,
+                default=DEFAULT_VALUES.nodata_value,
+                setting_type=float
             )
         )
         self.log_message(
@@ -492,7 +494,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         return target_extent
 
-    def replace_nodata(self, layer_path, output_path, nodata_value: float = -9999.0):
+    def replace_nodata(self, layer_path, output_path, nodata_value: float = DEFAULT_VALUES.nodata_value):
         """Adds nodata value info into the layer available
         in the passed layer_path and save the layer in the passed output_path
         path.
@@ -965,7 +967,6 @@ class ScenarioAnalysisTask(QgsTask):
                         directory=snapped_pathways_directory,
                         rescale_values=rescale_values,
                         resampling_method=resampling_method,
-                        nodata_value=nodata_value,
                         name=pathway.name
                     )
                     if output_path:
@@ -1025,7 +1026,6 @@ class ScenarioAnalysisTask(QgsTask):
                                 directory=snapped_priority_directory,
                                 rescale_values=rescale_values,
                                 resampling_method=resampling_method,
-                                nodata_value=nodata_value_priority,
                                 name=priority_layer.get("name", "priority layer")
                             )
 
@@ -1052,7 +1052,6 @@ class ScenarioAnalysisTask(QgsTask):
         directory: str,
         rescale_values: bool,
         resampling_method: int,
-        nodata_value: float = -9999.0,
         name: str = "layer"
     ):
         """Snaps the passed input layer using the reference layer and updates
@@ -1077,10 +1076,6 @@ class ScenarioAnalysisTask(QgsTask):
 
         :param resample_method: Method to use when resampling
         :type resample_method: QgsAlignRaster.ResampleAlg
-
-        :param nodata_value: Original no data value of the input layer
-        :type nodata_value: float
-
         """
         if not os.path.exists(input_path):
             self.log_message(
@@ -1372,7 +1367,7 @@ class ScenarioAnalysisTask(QgsTask):
 
     def run_pathways_replace_nodata(
             self,            
-            nodata_value: float = -9999.0
+            nodata_value: float = DEFAULT_VALUES.nodata_value
             ) -> bool:
         """Replace the nodata value for activity pathways and priority layers. 
         :param nodata_value: The nodata value to replace in the pathways and priority layers
@@ -1620,7 +1615,10 @@ class ScenarioAnalysisTask(QgsTask):
                     "IGNORE_NODATA": True,
                     "INPUT": layers,
                     "EXTENT": extent,
-                    "OUTPUT_NODATA_VALUE": -9999,
+                    "OUTPUT_NODATA_VALUE": self.get_settings_value(
+                        Settings.NCS_NO_DATA_VALUE,
+                        default=DEFAULT_VALUES.nodata_value
+                    ),
                     "REFERENCE_LAYER": reference_layer  ,
                     "STATISTIC": 0,  # Sum
                     "OUTPUT": output,
@@ -1800,7 +1798,10 @@ class ScenarioAnalysisTask(QgsTask):
                     "DESTINATION_CRS": activity_layer.crs(),
                     "TARGET_EXTENT": extent,
                     "OUTPUT": output,
-                    "NO_DATA": -9999,
+                    "NO_DATA": self.get_settings_value(
+                        Settings.NCS_NO_DATA_VALUE,
+                        default=DEFAULT_VALUES.nodata_value
+                    ),
                 }
 
                 self.log_message(
@@ -1995,7 +1996,10 @@ class ScenarioAnalysisTask(QgsTask):
                     "DESTINATION_CRS": activity_layer.crs(),
                     "TARGET_EXTENT": extent,
                     "OUTPUT": output,
-                    "NO_DATA": -9999,
+                    "NO_DATA": self.get_settings_value(
+                        Settings.NCS_NO_DATA_VALUE,
+                        default=DEFAULT_VALUES.nodata_value
+                    ),
                 }
 
                 self.log_message(
@@ -2367,7 +2371,10 @@ class ScenarioAnalysisTask(QgsTask):
                         "STATISTIC": 0,
                         "IGNORE_NODATA": False,
                         "REFERENCE_LAYER": sieve_output_updated,
-                        "OUTPUT_NODATA_VALUE": -9999,
+                        "OUTPUT_NODATA_VALUE": self.get_settings_value(
+                            Settings.NCS_NO_DATA_VALUE,
+                            default=DEFAULT_VALUES.nodata_value
+                        ),
                         "OUTPUT": output,
                     },
                     context=self.processing_context,
@@ -2750,7 +2757,10 @@ class ScenarioAnalysisTask(QgsTask):
                 "IGNORE_NODATA": True,
                 "INPUT_RASTERS": sources,
                 "EXTENT": extent_string,
-                "OUTPUT_NODATA_VALUE": -9999,
+                "OUTPUT_NODATA_VALUE": self.get_settings_value(
+                    Settings.NCS_NO_DATA_VALUE,
+                    default=DEFAULT_VALUES.nodata_value
+                ),
                 "REFERENCE_LAYER": reference_layer,
                 "OUTPUT": output_file,
             }
