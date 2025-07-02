@@ -1235,14 +1235,14 @@ class ScenarioAnalysisTask(QgsTask):
                 ):
                     self.set_info_message(
                         tr(
-                            f"No defined activity pathways or a"
-                            f" activity layer for the activity {activity.name}"
+                            f"No defined activity pathways or "
+                            f" activity layers for the activity {activity.name}"
                         ),
                         level=Qgis.Critical,
                     )
                     self.log_message(
-                        f"No defined activity pathways or a "
-                        f"activity layer for the activity {activity.name}"
+                        f"No defined activity pathways or "
+                        f"activity layers for the activity {activity.name}"
                     )
                     return False
 
