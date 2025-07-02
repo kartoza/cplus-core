@@ -575,7 +575,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             os.remove(result)
         
     def test_scenario_replace_nodata_value(self):
-        """Test the layer reprojection functionality."""
+        """Test replacing nodata value functionality."""
         pathways_directory = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "data", "pathways", "layers"
         )
