@@ -1420,12 +1420,6 @@ class ScenarioAnalysisTask(QgsTask):
                         pathways.append(pathway)
 
             if pathways is not None and len(pathways) > 0:
-                replaced_nodata_pathways_directory = os.path.join(
-                    self.scenario_directory, "pathways", "replaced_nodata"
-                )
-
-                BaseFileUtils.create_new_dir(replaced_nodata_pathways_directory)
-
                 for pathway in pathways:
                     pathway_layer = QgsRasterLayer(pathway.path, pathway.name)
 
@@ -1472,12 +1466,6 @@ class ScenarioAnalysisTask(QgsTask):
                         pathway.priority_layers is not None
                         and len(pathway.priority_layers) > 0
                     ):
-                        replaced_nodata_priority_directory = os.path.join(
-                            self.scenario_directory, "priority_layer", "replaced_nodata"
-                        )
-
-                        BaseFileUtils.create_new_dir(replaced_nodata_priority_directory)
-
                         priority_layers = []
                         for priority_layer in pathway.priority_layers:
                             if priority_layer is None:
