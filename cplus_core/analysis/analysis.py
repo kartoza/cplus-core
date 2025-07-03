@@ -1387,6 +1387,17 @@ class ScenarioAnalysisTask(QgsTask):
         pathways :typing.List[NcsPathway] = []
 
         try:
+            # Create directories for replaced nodata pathways and priority layers
+            replaced_nodata_pathways_directory = os.path.join(
+                self.scenario_directory, "pathways", "replaced_nodata"
+            )
+            BaseFileUtils.create_new_dir(replaced_nodata_pathways_directory)
+            
+            replaced_nodata_priority_directory = os.path.join(
+                self.scenario_directory, "priority_layer", "replaced_nodata"
+            )
+            BaseFileUtils.create_new_dir(replaced_nodata_priority_directory)
+
             for activity in self.analysis_activities:
                 if not activity.pathways and (
                     activity.path is None or activity.path == ""
