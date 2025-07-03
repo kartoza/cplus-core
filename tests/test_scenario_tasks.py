@@ -574,6 +574,110 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             self.assertNotEqual(raster.extent(), test_layer.extent())
             os.remove(result)
         
+    def test_scenario_replace_nodata_value(self):
+        """Test replacing nodata value functionality."""
+        pathways_directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "pathways", "layers"
+        )
 
+        pathway_layer_path_1 = os.path.join(
+            pathways_directory, "test_pathway_1.tif"
+        )
+
+        test_layer = QgsRasterLayer(pathway_layer_path_1, "test__layer")
+        self.assertTrue(test_layer.isValid())
+
+        test_provider = test_layer.dataProvider()
+        test_no_data_value = test_provider.sourceNoDataValue(1)
+        self.assertAlmostEqual(test_no_data_value, 0.0)
+       
+        extent = test_layer.extent()
+
+        spatial_extent = SpatialExtent(
+            bbox=[extent.xMinimum(), extent.xMaximum(), extent.yMinimum(), extent.yMaximum()],
+            crs=test_layer.crs().authid()
+        )
+
+        test_pathway = NcsPathway(
+            uuid=uuid.uuid4(),
+            name="test_pathway",
+            description="test_description",
+            path=pathway_layer_path_1,
+            priority_layers=[],
+        )
+
+        test_activity = Activity(
+            uuid=uuid.uuid4(),
+            name="test_activity",
+            description="test_description",
+            pathways=[test_pathway],
+        )
+
+        scenario = Scenario(
+            uuid=uuid.uuid4(),
+            name="Scenario",
+            description="Scenario description",
+            activities=[test_activity],
+            extent=spatial_extent,
+            priority_layer_groups=[],
+            weighted_activities=[]
+        )
+
+        base_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "data",
+            "pathways",
+        )
+
+        task_config = TaskConfig(
+            scenario=scenario,
+            priority_layers=priority_layers,
+            priority_layer_groups=test_priority_groups,
+            analysis_activities=scenario.activities,
+            all_activities=[test_activity],
+            snapping_enabled=False,
+            snap_layer=snapping_layer,
+            mask_layers_paths=",".join(mask_layers_paths),
+            snap_rescale=False,
+            snap_method=0,
+            pathway_suitability_index=0.0,
+            carbon_coefficient=1.0,
+            sieve_enabled=False,
+            sieve_threshold=10.0,
+            ncs_with_carbon=True,
+            landuse_project=True,
+            landuse_normalized=True,
+            landuse_weighted=True,
+            highest_position=True,
+            base_dir=base_dir,
+            nodata_value=-9999.0,  # Set the nodata value to replace
+        )
+
+        analysis_task = ScenarioAnalysisTask(
+            task_config=task_config
+        )
+
+        scenario_directory = os.path.join(
+            f"{base_dir}",
+            f'scenario_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}'
+            f"_{str(uuid.uuid4())[:4]}",
+        )
+
+        analysis_task.scenario_directory = scenario_directory
+
+        result = analysis_task.run_pathways_replace_nodata(
+            nodata_value=task_config.nodata_value,
+        )
+
+        self.assertTrue(result)
+
+        self.assertNotEqual(test_pathway.path, pathway_layer_path_1)
+
+        result_layer = QgsRasterLayer(test_pathway.path, test_pathway.name)
+        result_provider = result_layer.dataProvider()
+        result_no_data_value = result_provider.sourceNoDataValue(1)
+        self.assertEqual(result_no_data_value, task_config.nodata_value)   
+        self.assertTrue(BaseFileUtils.remove_dir(scenario_directory))
+        
     def tearDown(self):
         pass
