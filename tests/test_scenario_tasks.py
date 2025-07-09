@@ -678,6 +678,126 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
         result_no_data_value = result_provider.sourceNoDataValue(1)
         self.assertEqual(result_no_data_value, task_config.nodata_value)   
         self.assertTrue(BaseFileUtils.remove_dir(scenario_directory))
-        
+    
+    def test_scenario_layer_clipping(self):
+        activities_layer_directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "pathways", "layers"
+        )
+
+        mask_layers_directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "mask", "layers"
+        )
+
+        pathway_layer_path_1 = os.path.join(
+            activities_layer_directory, "test_pathway_1.tif"
+        )
+        mask_layer_path_1 = os.path.join(mask_layers_directory, "test_mask_1.shp")
+
+        test_pathway = NcsPathway(
+            uuid=uuid.uuid4(),
+            name="test_pathway",
+            description="test_description",
+            path=pathway_layer_path_1,
+            priority_layers=[],
+        )
+
+        test_activity = Activity(
+            uuid=uuid.uuid4(),
+            name="test_activity",
+            description="test_description",
+            pathways=[test_pathway],
+            path="",
+            mask_paths=[],
+        )
+
+        activity_layer = QgsRasterLayer(test_activity.path, test_activity.name)
+
+        test_extent = activity_layer.extent()
+
+        spatial_extent = SpatialExtent(
+            bbox=[test_extent.xMinimum(), test_extent.xMaximum(), test_extent.yMinimum(), test_extent.yMaximum()],
+            crs=activity_layer.crs().authid()
+        )
+
+        scenario = Scenario(
+            uuid=uuid.uuid4(),
+            name="Scenario",
+            description="Scenario description",
+            activities=[test_activity],
+            extent=spatial_extent,
+            priority_layer_groups=[],
+            weighted_activities=[]
+        )
+
+        task_config = TaskConfig(
+            scenario=scenario,
+            priority_layers=priority_layers,
+            priority_layer_groups=test_priority_groups,
+            analysis_activities=scenario.activities,
+            all_activities=[test_activity],
+            snapping_enabled=False,
+            snap_layer=None,
+            mask_layers_paths=",".join(mask_layers_paths),
+            snap_rescale=False,
+            snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
+            pathway_suitability_index=0.0,
+            carbon_coefficient=1.0,
+            sieve_enabled=False,
+            sieve_threshold=10.0,
+            ncs_with_carbon=True,
+            landuse_project=True,
+            landuse_normalized=True,
+            landuse_weighted=True,
+            highest_position=True,
+            base_dir=os.path.dirname(os.path.abspath(__file__)),
+            nodata_value=-9999.0,
+            studyarea_path=mask_layer_path_1,
+            clip_to_studyarea=True
+        )
+
+        analysis_task = ScenarioAnalysisTask(
+            task_config= task_config,
+        )
+
+        base_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "data",
+            "activities",
+        )
+
+        scenario_directory = os.path.join(
+            f"{base_dir}",
+            f'scenario_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}'
+            f"_{str(uuid.uuid4())[:4]}",
+        )
+
+        analysis_task.scenario_directory = scenario_directory
+
+        pathway_layer = QgsRasterLayer(test_pathway.path, test_pathway.name)
+        pathway_layer_stat = pathway_layer.dataProvider().bandStatistics(1)
+
+        self.assertEqual(pathway_layer_stat.minimumValue, 1.0)
+        self.assertEqual(pathway_layer_stat.maximumValue, 10.0)
+        self.assertAlmostEqual(pathway_layer_stat.mean, 5.583, places=3)
+
+        results = analysis_task.clip_analysis_data(
+            studyarea_path=mask_layer_path_1
+        )
+
+        self.assertIsInstance(results, bool)
+        self.assertTrue(results)
+
+        self.assertIsNotNone(test_activity.path)
+        self.assertNotEqual(test_pathway.path, pathway_layer_path_1)
+
+        result_layer = QgsRasterLayer(test_pathway.path, test_activity.name)
+        self.assertTrue(result_layer.isValid())
+
+        result_stat = result_layer.dataProvider().bandStatistics(1)
+        self.assertEqual(result_stat.minimumValue, 2.0)
+        self.assertEqual(result_stat.maximumValue, 10.0)
+        self.assertAlmostEqual(result_stat.mean, 6, places=3)
+        self.assertTrue(BaseFileUtils.remove_dir(scenario_directory))
+
     def tearDown(self):
         pass
