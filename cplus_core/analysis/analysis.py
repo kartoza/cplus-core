@@ -735,9 +735,8 @@ class ScenarioAnalysisTask(QgsTask):
                 f" using mask layer: {alg_params} \n"
             )
 
-            feedback = QgsProcessingFeedback()
-
-            feedback.progressChanged.connect(self.update_progress)
+            self.feedback = QgsProcessingFeedback()
+            self.feedback.progressChanged.connect(self.update_progress)
 
             if self.processing_cancelled:
                 return False
@@ -1429,8 +1428,8 @@ class ScenarioAnalysisTask(QgsTask):
             f"{alg_params} \n"
         )
 
-        feedback = QgsProcessingFeedback()
-        feedback.progressChanged.connect(self.update_progress)
+        self.feedback = QgsProcessingFeedback()
+        self.feedback.progressChanged.connect(self.update_progress)
 
         if self.processing_cancelled:
             return None
@@ -1866,9 +1865,8 @@ class ScenarioAnalysisTask(QgsTask):
                     f"{alg_params} \n"
                 )
 
-                feedback = QgsProcessingFeedback()
-
-                feedback.progressChanged.connect(self.update_progress)
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
 
                 if self.processing_cancelled:
                     return False
@@ -2045,9 +2043,8 @@ class ScenarioAnalysisTask(QgsTask):
                     f"Used parameters for masking the activities: {alg_params} \n"
                 )
 
-                feedback = QgsProcessingFeedback()
-
-                feedback.progressChanged.connect(self.update_progress)
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
 
                 if self.processing_cancelled:
                     return False
@@ -2243,9 +2240,8 @@ class ScenarioAnalysisTask(QgsTask):
                     f"Used parameters for masking the activity {activity.name}: {alg_params} \n"
                 )
 
-                feedback = QgsProcessingFeedback()
-
-                feedback.progressChanged.connect(self.update_progress)
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
 
                 if self.processing_cancelled:
                     return False
@@ -2576,6 +2572,13 @@ class ScenarioAnalysisTask(QgsTask):
                 # feedback.pushInfo(f"used expression 3 {expr_3}")
 
                 # Step 5. Replace all 0 with -9999 using if ("combined@1" <= 0, -9999, "combined@1")
+
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
+
+                if self.processing_cancelled:
+                    return False
+                
                 sieve_output_updated = processing.run(
                     "gdal:rastercalculator",
                     {
@@ -2601,6 +2604,7 @@ class ScenarioAnalysisTask(QgsTask):
                 # QgsProject.instance().addMapLayer(sieve_output_updated_layer)
 
                 # Step 6. Run sum statistics with ignore no data values set to false and no data value of -9999
+                
                 results = processing.run(
                     "native:cellstatistics",
                     {
@@ -2620,14 +2624,7 @@ class ScenarioAnalysisTask(QgsTask):
 
                 # self.log_message(
                 #     f"Used parameters for running sieve function to the models: {alg_params} \n"
-                # )
-
-                feedback = QgsProcessingFeedback()
-
-                feedback.progressChanged.connect(self.update_progress)
-
-                if self.processing_cancelled:
-                    return False
+                # )                
 
                 model.path = results["OUTPUT"]
 
@@ -2765,9 +2762,8 @@ class ScenarioAnalysisTask(QgsTask):
                     f"Used parameters for normalization of the activities: {alg_params} \n"
                 )
 
-                feedback = QgsProcessingFeedback()
-
-                feedback.progressChanged.connect(self.update_progress)
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
 
                 if self.processing_cancelled:
                     return False
@@ -2875,9 +2871,8 @@ class ScenarioAnalysisTask(QgsTask):
                     f"updates on the weighted activities: {alg_params} \n"
                 )
 
-                feedback = QgsProcessingFeedback()
-
-                feedback.progressChanged.connect(self.update_progress)
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
 
                 if self.processing_cancelled:
                     return False
@@ -3007,7 +3002,6 @@ class ScenarioAnalysisTask(QgsTask):
             )
 
             self.feedback = QgsProcessingFeedback()
-
             self.feedback.progressChanged.connect(self.update_progress)
 
             if self.processing_cancelled:
