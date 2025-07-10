@@ -27,3 +27,4 @@ class DEFAULT_VALUES(object):
     landuse_weighted = True
     highest_position = True
     nodata_value = -9999.0
+    clip_to_studyarea = False

@@ -49,3 +49,5 @@ class Settings(enum.Enum):
     LANDUSE_NORMALIZED = "landuse_normalized"
     LANDUSE_WEIGHTED = "landuse_weighted"
     HIGHEST_POSITION = "highest_position"
+
+    STUDYAREA_PATH = "studyarea_path"

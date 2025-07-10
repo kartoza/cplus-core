@@ -40,6 +40,7 @@ class TaskConfig(object):
     highest_position = DEFAULT_VALUES.highest_position
     base_dir = ""
     nodata_value = DEFAULT_VALUES.nodata_value
+    clip_to_studyarea:bool = DEFAULT_VALUES.clip_to_studyarea
 
     def __init__(
         self,
@@ -64,6 +65,8 @@ class TaskConfig(object):
         highest_position=DEFAULT_VALUES.highest_position,
         base_dir="",
         nodata_value=DEFAULT_VALUES.nodata_value,
+        studyarea_path=None,
+        clip_to_studyarea=False
     ) -> None:
         """Initialize analysis task configuration.
 
@@ -130,6 +133,11 @@ class TaskConfig(object):
         :param nodata_value: No data value for raster layers,
             defaults to DEFAULT_VALUES.nodata_value
         :type nodata_value: float, optional
+        :param studyarea_path: Path to study area layer,
+            defaults to None
+        :type studyarea_path: str, optional
+        :param clip_to_studyarea: enable clipping by study area layer, defaults to False
+        :type clip_to_studyarea: bool, optional
         """
         self.scenario = scenario
         self.priority_layers = priority_layers
@@ -158,6 +166,8 @@ class TaskConfig(object):
         self.base_dir = base_dir
 
         self.nodata_value = nodata_value
+        self.studyarea_path = studyarea_path
+        self.clip_to_studyarea = clip_to_studyarea
 
     def get_activity(
             self, activity_uuid: str) -> typing.Union[Activity, None]:
@@ -247,6 +257,8 @@ class TaskConfig(object):
             "highest_position": self.highest_position,
             "base_dir": self.base_dir,
             "nodata_value": self.nodata_value,
+            "studyarea_path": self.studyarea_path,
+            "clip_to_studyarea": self.clip_to_studyarea
         }
         for activity in self.scenario.activities:
             activity_dict = {
