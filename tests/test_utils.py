@@ -8,9 +8,7 @@ from qgis.core import QgsCoordinateReferenceSystem, QgsRectangle
 from cplus_core.utils.helper import (
     align_rasters,
     todict,
-    transform_extent,
-    normalize_raster_layer,
-    replace_nodata_value_from_reference
+    transform_extent
 )
 
 
