@@ -36,7 +36,6 @@ from ..utils.helper import (
     clean_filename,
     tr,
     BaseFileUtils,
-    replace_nodata_value_from_reference
 )
 from .task_config import TaskConfig
 
@@ -579,7 +578,7 @@ class ScenarioAnalysisTask(QgsTask):
             )
 
         return False
-
+    
     def run_pathways_normalization(
         self, 
     ) -> bool:
@@ -1219,6 +1218,7 @@ class ScenarioAnalysisTask(QgsTask):
                         directory=snapped_pathways_directory,
                         rescale_values=rescale_values,
                         resampling_method=resampling_method,
+                        nodata_value=nodata_value,
                         name=pathway.name
                     )
                     if output_path:
@@ -1278,6 +1278,7 @@ class ScenarioAnalysisTask(QgsTask):
                                 directory=snapped_priority_directory,
                                 rescale_values=rescale_values,
                                 resampling_method=resampling_method,
+                                nodata_value=nodata_value_priority,
                                 name=priority_layer.get("name", "priority layer")
                             )
 
@@ -1304,6 +1305,7 @@ class ScenarioAnalysisTask(QgsTask):
         directory: str,
         rescale_values: bool,
         resampling_method: int,
+        nodata_value: float = DEFAULT_VALUES.nodata_value,
         name: str = "layer"
     ):
         """Snaps the passed input layer using the reference layer and updates
@@ -1328,6 +1330,13 @@ class ScenarioAnalysisTask(QgsTask):
 
         :param resample_method: Method to use when resampling
         :type resample_method: QgsAlignRaster.ResampleAlg
+
+        :param nodata_value: No data value to be set in the output layer. Defaults to -9999.0
+        :type nodata_value: float
+
+        :param name: Name of the layer
+        :type name: str
+
         """
         if not os.path.exists(input_path):
             self.log_message(
@@ -1370,10 +1379,10 @@ class ScenarioAnalysisTask(QgsTask):
 
             output_path = os.path.join(directory, f"{name}_final.tif")
 
-            ok, logs = replace_nodata_value_from_reference(
-                source_path=input_result_path,
-                reference_path=reference_path, 
-                output_path=output_path,
+            ok = self.replace_nodata(
+                layer_path=input_result_path,
+                output_path=reference_path, 
+                nodata_value=nodata_value,
             )
 
             if ok:
