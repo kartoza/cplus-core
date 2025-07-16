@@ -36,7 +36,6 @@ from ..utils.helper import (
     clean_filename,
     tr,
     BaseFileUtils,
-    normalize_raster_layer
 )
 from .task_config import TaskConfig
 
@@ -595,6 +594,11 @@ class ScenarioAnalysisTask(QgsTask):
         self.set_status_message(tr("Normalization of pathways"))
         pathways :typing.List[NcsPathway] = []
 
+        normalized_pathways_directory = os.path.join(
+            self.scenario_directory, "normalized_pathways"
+        )
+        BaseFileUtils.create_new_dir(normalized_pathways_directory)
+
         try:
             for activity in self.analysis_activities:
                 if not activity.pathways and (
@@ -618,12 +622,6 @@ class ScenarioAnalysisTask(QgsTask):
                         pathways.append(pathway)
 
             if len(pathways) > 0:
-                normalized_pathways_directory = os.path.join(
-                    self.scenario_directory, "normalized_pathways"
-                )
-
-                BaseFileUtils.create_new_dir(normalized_pathways_directory)
-
                 for pathway in pathways:
                     if self.processing_cancelled:
                         return False
@@ -661,21 +659,38 @@ class ScenarioAnalysisTask(QgsTask):
                     
                     self.log_message(f"Normalizing {pathway.name} pathway layer \n")
 
-                    # Pathway normalization
-                    output_path, logs = normalize_raster_layer(
-                        input_path=pathway.path,
-                        output_directory=normalized_pathways_directory
+                    expression = f"(A - {min_value}) / ({max_value} - {min_value})"
+                    output_path = os.path.join(
+                        f"{normalized_pathways_directory}",
+                        f"{Path(pathway.path).stem}_norm_{str(uuid.uuid4())[:4]}.tif"
                     )
-                    if output_path:
-                        pathway.path = output_path
+                    alg_params = {
+                        'INPUT_A': pathway.path,
+                        "BAND_A": 1,
+                        'FORMULA': expression,
+                        'OPTIONS':'COMPRESS=DEFLATE|ZLEVEL=6|TILED=YES', # Compress the layer
+                        'OUTPUT': output_path,
+                    }
+
+                    self.feedback = QgsProcessingFeedback()
+                    self.feedback.progressChanged.connect(self.update_progress)
+
+                    if self.processing_cancelled:
+                        return False
+
+                    result = processing.run(
+                        "gdal:rastercalculator",
+                        alg_params,
+                        context=self.processing_context,
+                        feedback=self.feedback,
+                    )
+                    if result.get("OUTPUT"):
+                        pathway.path = result.get("OUTPUT")
                     else:
                         self.log_message(
                             f"Problem normalizing pathway layer {pathway.name}, "
                             f"skipping the layer from normalization."
                         )
-                        for log in logs:
-                            self.log_message(log, info=("Problem" not in log))
-                        continue
             return True
         except Exception as e:
             self.log_message(f"Problem normalizing pathways, {e} \n")

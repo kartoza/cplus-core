@@ -9,7 +9,6 @@ from cplus_core.utils.helper import (
     align_rasters,
     todict,
     transform_extent,
-    normalize_raster_layer
 )
 
 
