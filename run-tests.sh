@@ -20,7 +20,6 @@ do
     docker-compose up -d
 
     sleep 10
-    docker-compose exec -T qgis-testing-environment sh -c "pip3 install rasterio"
 
     docker-compose exec -T qgis-testing-environment qgis_testrunner.sh test_suite.test_package
 

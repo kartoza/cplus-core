@@ -14,8 +14,6 @@ from uuid import UUID
 from enum import Enum
 import shutil
 
-import rasterio
-
 from qgis.PyQt import QtCore
 from qgis.core import (
     QgsCoordinateReferenceSystem,
