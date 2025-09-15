@@ -1800,8 +1800,8 @@ class ScenarioAnalysisTask(QgsTask):
     def run_pathways_carbon_summation(self) -> bool:
         """Calculates total carbon mitigation values for the Naturebase pathways.
 
-        :returns: A dictionary with pathway name as keys and their total carbon values as values
-        :rtype: false
+        :returns: True if the task operation was successfully completed else False.
+        :rtype: bool
         """
         if self.processing_cancelled:
             return False
