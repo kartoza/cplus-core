@@ -1834,7 +1834,7 @@ class ScenarioAnalysisTask(QgsTask):
                     if not (pathway in pathways):
                         pathways.append(pathway)
 
-            if pathways is not None and len(pathways) > 0:
+            if len(pathways) > 0:
                 for pathway in pathways:
                     if pathway.name.startswith("Naturebase:") is False:
                         continue
