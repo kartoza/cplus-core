@@ -67,6 +67,8 @@ class ScenarioAnalysisTask(QgsTask):
         self.analys_crs = task_config.scenario.extent.crs
         self.clip_to_studyarea = task_config.clip_to_studyarea
 
+        self.relative_impact_matrix = task_config.relative_impact_matrix
+
         self.analysis_weighted_activities = []
         self.scenario_result = None
 
@@ -1071,6 +1073,29 @@ class ScenarioAnalysisTask(QgsTask):
                     for priority_layer in settings_priority_layers:
                         if priority_layer.get("name") == layer.get("name"):
                             for group in priority_layer.get("groups", []):
+                                pathway_uuids = self.relative_impact_matrix.get("pathway_uuids", [])
+                                priority_layer_uuids = self.relative_impact_matrix.get("priority_layer_uuids", [])
+                                relative_impact_values = self.relative_impact_matrix.get("values", [])
+
+                                try:
+                                    row = pathway_uuids.index(str(pathway.uuid))
+                                    col = priority_layer_uuids.index(layer["uuid"])
+                                except ValueError:
+                                    self.log_message(
+                                        f"Could not find pathway uuid {pathway.uuid} or "
+                                        f"priority layer uuid {layer['uuid']} in the relative impact matrix."
+                                    )
+                                    impact_value = None
+                                else:
+                                    if row < len(relative_impact_values) and col < len(relative_impact_values[row]):
+                                        impact_value = relative_impact_values[row][col]
+                                    else:
+                                        self.log_message(
+                                            f"Index out of range for relative impact "
+                                            f"matrix: row={row}, col={col}."
+                                        )
+                                        impact_value = None
+
                                 value = group.get("value")
                                 priority_group_coefficient = float(value)
                                 if priority_group_coefficient > 0:
@@ -1081,6 +1106,12 @@ class ScenarioAnalysisTask(QgsTask):
                                         f'({priority_group_coefficient}*'
                                         f'"{pwl_path_basename}@1")'
                                     )
+
+                                    if impact_value is not None and impact_value != 0:
+                                        pwl_expression = (
+                                            f'({priority_group_coefficient * int(impact_value)}*'
+                                            f'"{pwl_path_basename}@1")'
+                                        )
                                     base_names.append(pwl_expression)
                                     if not run_calculation:
                                         run_calculation = True
