@@ -968,6 +968,11 @@ class ScenarioAnalysisTask(QgsTask):
             self.log_message(msg)
             return False
 
+        # Get relative impact matrix items
+        pathway_uuids = self.relative_impact_matrix.get("pathway_uuids", [])
+        priority_layer_uuids = self.relative_impact_matrix.get("priority_layer_uuids", [])
+        relative_impact_values = self.relative_impact_matrix.get("values", [])
+        
         # Get valid pathways
         pathways: typing.List[NcsPathway] = []
         activities_paths = []
@@ -1073,10 +1078,6 @@ class ScenarioAnalysisTask(QgsTask):
                     for priority_layer in settings_priority_layers:
                         if priority_layer.get("name") == layer.get("name"):
                             for group in priority_layer.get("groups", []):
-                                pathway_uuids = self.relative_impact_matrix.get("pathway_uuids", [])
-                                priority_layer_uuids = self.relative_impact_matrix.get("priority_layer_uuids", [])
-                                relative_impact_values = self.relative_impact_matrix.get("values", [])
-
                                 try:
                                     row = pathway_uuids.index(str(pathway.uuid))
                                     col = priority_layer_uuids.index(layer["uuid"])
