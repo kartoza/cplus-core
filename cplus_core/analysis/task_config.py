@@ -39,8 +39,10 @@ class TaskConfig(object):
     landuse_weighted = DEFAULT_VALUES.landuse_weighted
     highest_position = DEFAULT_VALUES.highest_position
     base_dir = ""
+
     nodata_value = DEFAULT_VALUES.nodata_value
     clip_to_studyarea:bool = DEFAULT_VALUES.clip_to_studyarea
+    relative_impact_matrix: typing.Dict = {}
 
     def __init__(
         self,
@@ -66,7 +68,8 @@ class TaskConfig(object):
         base_dir="",
         nodata_value=DEFAULT_VALUES.nodata_value,
         studyarea_path=None,
-        clip_to_studyarea=False
+        clip_to_studyarea=False,
+        relative_impact_matrix={}
     ) -> None:
         """Initialize analysis task configuration.
 
@@ -138,6 +141,10 @@ class TaskConfig(object):
         :type studyarea_path: str, optional
         :param clip_to_studyarea: enable clipping by study area layer, defaults to False
         :type clip_to_studyarea: bool, optional
+
+        :param relative_impact_matrix: Matrix of relative impact values
+            between pathways and PWLs, defaults to empty dictionary
+        :type relative_impact_matrix: typing.Dict, optional
         """
         self.scenario = scenario
         self.priority_layers = priority_layers
@@ -168,6 +175,8 @@ class TaskConfig(object):
         self.nodata_value = nodata_value
         self.studyarea_path = studyarea_path
         self.clip_to_studyarea = clip_to_studyarea
+
+        self.relative_impact_matrix = relative_impact_matrix
 
     def get_activity(
             self, activity_uuid: str) -> typing.Union[Activity, None]:
@@ -258,7 +267,8 @@ class TaskConfig(object):
             "base_dir": self.base_dir,
             "nodata_value": self.nodata_value,
             "studyarea_path": self.studyarea_path,
-            "clip_to_studyarea": self.clip_to_studyarea
+            "clip_to_studyarea": self.clip_to_studyarea,
+            "relative_impact_matrix": self.relative_impact_matrix
         }
         for activity in self.scenario.activities:
             activity_dict = {
