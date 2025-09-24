@@ -1108,10 +1108,16 @@ class ScenarioAnalysisTask(QgsTask):
                                         f'"{pwl_path_basename}@1")'
                                     )
 
-                                    if impact_value is not None and impact_value != 0:
+                                    if impact_value is not None:                                        
                                         pwl_expression = (
                                             f'({priority_group_coefficient * int(impact_value)}*'
                                             f'"{pwl_path_basename}@1")'
+                                        )
+                                        # Inverse the PWL
+                                        if impact_value < 0:
+                                            pwl_expression = (
+                                                f'({priority_group_coefficient * abs(int(impact_value))}*'
+                                                f'("{pwl_path_basename}@1" - 1) * -1)'
                                         )
                                     base_names.append(pwl_expression)
                                     if not run_calculation:
@@ -1127,7 +1133,11 @@ class ScenarioAnalysisTask(QgsTask):
                     weighted_pathways_directory,
                     f"{file_name}_{str(uuid.uuid4())[:4]}.tif",
                 )
-                expression = " + ".join(base_names)
+
+                expression = f"{base_names[0]}"                
+                if len(base_names) > 1:
+                    pwl_calc_expression = " + ".join(base_names[1:])
+                    expression += f" * ({pwl_calc_expression})"
 
                 output = (
                     QgsProcessing.TEMPORARY_OUTPUT
