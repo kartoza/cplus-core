@@ -712,7 +712,7 @@ class ScenarioAnalysisTask(QgsTask):
     def run_activity_normalization(
         self, 
     ) -> bool:
-        """Runs normalization analysis on the the activities.
+        """Runs normalization analysis on the activities.
         The formula is: (activity - min) / (max - min)
 
         :returns: True if the task operation was successfully completed else False.
