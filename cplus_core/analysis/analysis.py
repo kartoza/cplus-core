@@ -731,7 +731,7 @@ class ScenarioAnalysisTask(QgsTask):
 
         try:
             for activity in self.analysis_activities:
-                if activity.path is None or activity.path == "":
+                if not activity.path:
                     msg = f"No defined activity layer for the activity {activity.name}"
                     self.set_info_message(
                         tr(msg),
