@@ -377,6 +377,11 @@ class ScenarioAnalysisTask(QgsTask):
             temporary_output=not save_output,
         )
 
+        # Normalize the activities. 
+        # This is useful when weighting pathways with relative impact matrix
+        # Activities created in previous step may have values greater than 1
+        self.run_activity_normalization()
+
         # Run masking of the activities layers
         masking_layers = self.get_masking_layers()
         self.log_message(f"Masking layers: {masking_layers}")
@@ -704,6 +709,112 @@ class ScenarioAnalysisTask(QgsTask):
             self.cancel_task(e)
             return False
     
+    def run_activity_normalization(
+        self, 
+    ) -> bool:
+        """Runs normalization analysis on the activities.
+        The formula is: (activity - min) / (max - min)
+
+        :returns: True if the task operation was successfully completed else False.
+        :rtype: bool
+    """
+        if self.processing_cancelled:
+            return False
+
+        self.set_status_message(tr("Normalization of activities"))
+        pathways :typing.List[NcsPathway] = []
+
+        normalized_activities_directory = os.path.join(
+            self.scenario_directory, "normalized_activities"
+        )
+        BaseFileUtils.create_new_dir(normalized_activities_directory)
+
+        try:
+            for activity in self.analysis_activities:
+                if not activity.path:
+                    msg = f"No defined activity layer for the activity {activity.name}"
+                    self.set_info_message(
+                        tr(msg),
+                        level=Qgis.Critical,
+                    )
+                    self.log_message(msg)
+                    return False
+
+                if self.processing_cancelled:
+                    return False
+                    
+                activity_layer = QgsRasterLayer(activity.path, activity.name)
+
+                if not activity_layer.isValid():
+                    self.log_message(
+                        f"Activity layer {activity.name} is not valid, "
+                        f"skipping the layer from normalization."
+                    )
+                    continue
+
+                provider = activity_layer.dataProvider()
+                band_statistics = provider.bandStatistics(1)
+                min_value = band_statistics.minimumValue
+                max_value = band_statistics.maximumValue
+
+                if min_value is None or max_value is None:
+                    self.log_message(
+                        f"Activity layer {activity.name} has no valid "
+                        f"statistics, skipping the layer from normalization."
+                    )
+                    continue
+                    
+                if min_value >= 0 and max_value <= 1:                        
+                    new_path = BaseFileUtils.copy_file(activity.path, normalized_activities_directory)
+                    if new_path and os.path.exists(new_path):
+                        activity.path = new_path
+                        self.log_message(
+                            f"Activity layer {activity.name} is already normalized (min={min_value}, max={max_value}), "
+                            f"skipping the layer from normalization."
+                        )
+                    continue             
+                    
+                self.log_message(f"Normalizing {activity.name} activity layer \n")
+
+                expression = f"(A - {min_value}) / ({max_value} - {min_value})"
+                output_path = os.path.join(
+                    f"{normalized_activities_directory}",
+                    f"{Path(activity.path).stem}_norm_{str(uuid.uuid4())[:4]}.tif"
+                )
+                alg_params = {
+                    'INPUT_A': activity.path,
+                    'BAND_A': 1,
+                    'FORMULA': expression,
+                    'OPTIONS':'COMPRESS=DEFLATE|ZLEVEL=6|TILED=YES', # Compress the layer
+                    'OUTPUT': output_path,
+                }
+
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
+
+                if self.processing_cancelled:
+                    return False
+
+                result = processing.run(
+                    "gdal:rastercalculator",
+                    alg_params,
+                    context=self.processing_context,
+                    feedback=self.feedback,
+                )
+                if result.get("OUTPUT"):
+                    activity.path = result.get("OUTPUT")
+                else:
+                    self.log_message(
+                        f"Problem normalizing activity layer {activity.name}, "
+                        f"skipping the layer from normalization."
+                    )
+            return True
+        except Exception as e:
+            self.log_message(f"Problem normalizing activities, {e} \n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)
+            return False
+    
     def clip_raster_by_mask(self, 
         input_raster_path: str,
         mask_layer_path: str,
@@ -937,9 +1048,9 @@ class ScenarioAnalysisTask(QgsTask):
         """Runs weighting analysis on the pathways in the activities using
         the corresponding NCS PWLs.
 
-        The formula is: (suitability_index * pathway) +
-        (priority group coefficient 1 * PWL 1) +
-        (priority group coefficient 2 * PWL 2) ...
+        The formula is: (suitability_index * pathway) *
+        ((priority group coefficient 1 * impact weight * PWL 1) +
+        (priority group coefficient 2 * impact weight * PWL 2) ...)
 
         :param priority_layers_groups: Used priority layers groups and their values
         :type priority_layers_groups: dict
@@ -1108,10 +1219,16 @@ class ScenarioAnalysisTask(QgsTask):
                                         f'"{pwl_path_basename}@1")'
                                     )
 
-                                    if impact_value is not None and impact_value != 0:
+                                    if impact_value is not None:                                        
                                         pwl_expression = (
                                             f'({priority_group_coefficient * int(impact_value)}*'
                                             f'"{pwl_path_basename}@1")'
+                                        )
+                                        # Inverse the PWL
+                                        if impact_value < 0:
+                                            pwl_expression = (
+                                                f'({priority_group_coefficient * abs(int(impact_value))}*'
+                                                f'("{pwl_path_basename}@1" - 1) * -1)'
                                         )
                                     base_names.append(pwl_expression)
                                     if not run_calculation:
@@ -1127,7 +1244,11 @@ class ScenarioAnalysisTask(QgsTask):
                     weighted_pathways_directory,
                     f"{file_name}_{str(uuid.uuid4())[:4]}.tif",
                 )
-                expression = " + ".join(base_names)
+
+                expression = f"{base_names[0]}"                
+                if len(base_names) > 1:
+                    pwl_calc_expression = " + ".join(base_names[1:])
+                    expression += f" * ({pwl_calc_expression})"
 
                 output = (
                     QgsProcessing.TEMPORARY_OUTPUT
@@ -2753,154 +2874,6 @@ class ScenarioAnalysisTask(QgsTask):
 
         except Exception as e:
             self.log_message(f"Problem running sieve function on models layers, {e} \n")
-            self.cancel_task(e)
-            return False
-
-        return True
-
-    def run_activities_normalization(
-            self,
-            extent: str,
-            temporary_output: bool = False):
-        """Runs the normalization analysis on the activities' layers,
-        adjusting band values measured on different scale, the resulting scale
-        is computed using the below formula
-        Normalized_activity = (Carbon coefficient + Suitability index) * (
-            (Activity layer value) - (Activity band minimum value)) /
-            (Activity band maximum value - Activity band minimum value))
-
-        If the carbon coefficient and suitability index are both zero then
-        the computation won't take them into account in the normalization
-        calculation.
-
-        :param extent: Selected area of interest extent
-        :type extent: str
-
-        :param temporary_output: Whether to save the processing outputs as
-        temporary files
-        :type temporary_output: bool
-
-        :returns: Whether the task operations was successful
-        :rtype: bool
-        """
-        if self.processing_cancelled:
-            # Will not proceed if processing has been cancelled by the user
-            return False
-
-        self.set_status_message(tr("Normalization of the activities"))
-
-        try:
-            for activity in self.analysis_activities:
-                if activity.path is None or activity.path == "":
-                    if not self.processing_cancelled:
-                        self.set_info_message(
-                            tr(
-                                f"Problem when running activities normalization, "
-                                f"there is no map layer for the activity {activity.name}"
-                            ),
-                            level=Qgis.Critical,
-                        )
-                        self.log_message(
-                            f"Problem when running activities normalization, "
-                            f"there is no map layer for the activity {activity.name}"
-                        )
-                    else:
-                        # If the user cancelled the processing
-                        self.set_info_message(
-                            tr(f"Processing has been cancelled by the user."),
-                            level=Qgis.Critical,
-                        )
-                        self.log_message(f"Processing has been cancelled by the user.")
-
-                    return False
-
-                layers = []
-                normalized_activities_directory = os.path.join(
-                    self.scenario_directory, "normalized_activities"
-                )
-                BaseFileUtils.create_new_dir(normalized_activities_directory)
-                file_name = clean_filename(activity.name.replace(" ", "_"))
-
-                output_file = os.path.join(
-                    normalized_activities_directory,
-                    f"{file_name}_{str(uuid.uuid4())[:4]}.tif",
-                )
-
-                activity_layer = QgsRasterLayer(activity.path, activity.name)
-                provider = activity_layer.dataProvider()
-                band_statistics = provider.bandStatistics(1)
-
-                min_value = band_statistics.minimumValue
-                max_value = band_statistics.maximumValue
-
-                self.log_message(
-                    f"Found minimum {min_value} and "
-                    f"maximum {max_value} for activity {activity.name} \n"
-                )
-
-                layer_name = Path(activity.path).stem
-
-                layers.append(activity.path)
-
-                carbon_coefficient = float(
-                    self.get_settings_value(Settings.CARBON_COEFFICIENT, default=0.0)
-                )
-
-                suitability_index = float(
-                    self.get_settings_value(
-                        Settings.PATHWAY_SUITABILITY_INDEX, default=0
-                    )
-                )
-
-                normalization_index = carbon_coefficient + suitability_index
-
-                if normalization_index > 0:
-                    expression = (
-                        f" {normalization_index} * "
-                        f'("{layer_name}@1" - {min_value}) /'
-                        f" ({max_value} - {min_value})"
-                    )
-
-                else:
-                    expression = (
-                        f'("{layer_name}@1" - {min_value}) /'
-                        f" ({max_value} - {min_value})"
-                    )
-
-                output = (
-                    QgsProcessing.TEMPORARY_OUTPUT if temporary_output else output_file
-                )
-
-                # Actual processing calculation
-                alg_params = {
-                    "CELLSIZE": 0,
-                    "CRS": None,
-                    "EXPRESSION": expression,
-                    "EXTENT": extent,
-                    "LAYERS": layers,
-                    "OUTPUT": output,
-                }
-
-                self.log_message(
-                    f"Used parameters for normalization of the activities: {alg_params} \n"
-                )
-
-                self.feedback = QgsProcessingFeedback()
-                self.feedback.progressChanged.connect(self.update_progress)
-
-                if self.processing_cancelled:
-                    return False
-
-                results = processing.run(
-                    "qgis:rastercalculator",
-                    alg_params,
-                    context=self.processing_context,
-                    feedback=self.feedback,
-                )
-                activity.path = results["OUTPUT"]
-
-        except Exception as e:
-            self.log_message(f"Problem normalizing activity layers, {e} \n")
             self.cancel_task(e)
             return False
 
