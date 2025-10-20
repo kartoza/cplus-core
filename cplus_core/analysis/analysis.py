@@ -412,6 +412,10 @@ class ScenarioAnalysisTask(QgsTask):
             temporary_output=not save_output
         )
 
+        # Investability
+        self.run_investability_analysis()
+        
+
         # The highest position tool analysis
         save_output = self.get_settings_value(
             Settings.HIGHEST_POSITION, default=True, setting_type=bool
@@ -2987,6 +2991,119 @@ class ScenarioAnalysisTask(QgsTask):
             self.cancel_task(e)
             return False
 
+        return True
+    
+    def run_investability_analysis(self) -> bool:
+        """Run activity investability analysis
+
+        :returns: True if the task operation was successfully completed else False.
+        :rtype: bool
+        """
+        if self.processing_cancelled:
+            return False
+
+        self.set_status_message(
+            tr("Calculating investability of the activities")
+        )
+
+        investable_activities = os.path.join(
+            self.scenario_directory, "investable_activities"
+        )
+        BaseFileUtils.create_new_dir(investable_activities)
+
+        try:
+            for activity in self.analysis_activities:
+                if activity.path is None or activity.path == "":
+                    self.log_message(
+                        f"Problem when running activity investability, "
+                        f"there is no map layer for the activity {activity.name}"
+                    )
+
+                    return False
+                
+                if not os.path.exists(activity.path):
+                    self.log_message(
+                        f"Problem when running activity investability, "
+                        f"the map layer for the activity {activity.name} does not exist"
+                    )
+                    return False
+                
+                layers = [activity.path]
+
+                activity_basename = Path(activity.path).stem
+                expression_items = [f'("{activity_basename}@1")']
+                
+                constant_rasters = activity.constant_rasters
+                if not constant_rasters or len(constant_rasters) > 0:
+                    self.log_message(
+                        f"No defined constant rasters, "
+                        f"Skipping investability analysis for the activity {activity.name}"
+                    )
+
+                if self.processing_cancelled:
+                    return False
+                
+                nr_constant_rasters = len(constant_rasters)
+
+                for constant_raster in constant_rasters:                    
+                    constant_raster_layer = QgsRasterLayer(
+                        constant_raster.get("path", ""),
+                        constant_raster.get("name", "constant raster")
+                    )
+                    if not constant_raster_layer.isValid():
+                        self.log_message(
+                            f"Constant raster layer {constant_raster.get('name')} is not valid, "
+                            f"skipping the layer from investability analysis."
+                        )
+                        continue
+
+                    layers.append(constant_raster.get("path"))
+                    expression_items.append(
+                        f'("{Path(constant_raster.get("path")).stem}@1" / {nr_constant_rasters})')
+                
+                output_path = os.path.join(
+                    f"{investable_activities}",
+                    f"{Path(activity.path).stem}_invest_{str(uuid.uuid4())[:4]}.tif"
+                )
+
+                alg_params = {
+                    "CELLSIZE": 0,
+                    "CRS": None,
+                    "EXPRESSION": " + ".join(expression_items),
+                    "LAYERS": layers,
+                    "OUTPUT": output_path,
+                }
+
+                self.log_message(
+                    f" Used parameters for calculating investability for activity {activity.name}, "
+                    f"{alg_params} \n"
+                )
+
+                self.feedback = QgsProcessingFeedback()
+                self.feedback.progressChanged.connect(self.update_progress)
+
+                if self.processing_cancelled:
+                    return False
+
+                result = processing.run(
+                    "qgis:rastercalculator",
+                    alg_params,
+                    context=self.processing_context,
+                    feedback=self.feedback,
+                )
+
+                if result.get("OUTPUT"):
+                    activity.path = result.get("OUTPUT")
+                else:
+                    self.log_message(
+                        f"Problem calculating investability for activity {activity.name}"
+                    )                
+        except Exception as e:
+            self.log_message(f"Problem calculating activity investability, {e} \n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)
+            return False
+        
         return True
 
     def run_highest_position_analysis(self, temporary_output: bool =False):
