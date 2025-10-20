@@ -530,6 +530,155 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
 
         self.assertTrue(BaseFileUtils.remove_dir(scenario_directory))
 
+    def test_scenario_activity_investability(self):
+        "Test the activity investability analysis"
+
+        constant_layers_directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "constants", "layers"
+        )
+
+        npv_layer_path_1 = os.path.join(constant_layers_directory, "test_npv.tif")
+        years_experience_layer_path_1 = os.path.join(constant_layers_directory, "test_years_experience.tif")
+        market_trends_layer_path_1 = os.path.join(constant_layers_directory, "test_market_trends.tif")
+        confidence_layer_path_1 = os.path.join(constant_layers_directory, "test_confidence.tif")
+
+        self.assertTrue(os.path.exists(npv_layer_path_1))
+        self.assertTrue(os.path.exists(years_experience_layer_path_1))
+        self.assertTrue(os.path.exists(market_trends_layer_path_1))
+        self.assertTrue(os.path.exists(confidence_layer_path_1))
+
+        npv_layer = {
+            "uuid": "a931282f-db2d-4644-9786-6720b3ab206a",
+            "name": "NPV",
+            "description": "test_npv_layer_description",
+            "path": npv_layer_path_1,
+        }
+
+        years_experience_layer = {
+            "uuid": "b931282f-db2d-4644-9786-6720b3ab206b",
+            "name": "Year of Experience",
+            "description": "test_years_experience_layer_description",
+            "path": years_experience_layer_path_1,
+        }
+
+        market_trends_layer = {
+            "uuid": "c931282f-db2d-4644-9786-6720b3ab206c",
+            "name": "Market Trends",
+            "description": "test_market_trends_layer_description",
+            "path": market_trends_layer_path_1,
+        }
+
+        confidence_layer = {
+            "uuid": "d931282f-db2d-4644-9786-6720b3ab206d",
+            "name": "Confidence in ability to deliver",
+            "description": "test_confidence_layer_description",
+            "path": confidence_layer_path_1,
+        }
+
+        activities_layer_directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "activities", "layers"
+        )
+
+        activity_layer_path = os.path.join(
+            activities_layer_directory, "test_activity_2.tif"
+        )
+
+        test_activity = Activity(
+            uuid=uuid.uuid4(),
+            name="test_activity",
+            description="test_description",
+            pathways=[],
+            path=activity_layer_path,
+            mask_paths=[],
+            constant_rasters=[npv_layer, years_experience_layer, market_trends_layer, confidence_layer]
+        )
+
+        activity_layer = QgsRasterLayer(test_activity.path, test_activity.name)
+
+        test_extent = activity_layer.extent()
+
+        spatial_extent = SpatialExtent(
+            bbox=[test_extent.xMinimum(), test_extent.xMaximum(), test_extent.yMinimum(), test_extent.yMaximum()],
+            crs=activity_layer.crs().authid()
+        )
+
+        scenario = Scenario(
+            uuid=uuid.uuid4(),
+            name="Scenario",
+            description="Scenario description",
+            activities=[test_activity],
+            extent=spatial_extent,
+            priority_layer_groups=[],
+            weighted_activities=[]
+        )
+
+        task_config = TaskConfig(
+            scenario=scenario,
+            priority_layers=priority_layers,
+            priority_layer_groups=test_priority_groups,
+            analysis_activities=scenario.activities,
+            all_activities=[test_activity],
+            snapping_enabled=False,
+            snap_layer=None,
+            mask_layers_paths=",".join(mask_layers_paths),
+            snap_rescale=False,
+            snap_method=0,
+            pathway_suitability_index=0.0,
+            carbon_coefficient=1.0,
+            sieve_enabled=False,
+            sieve_threshold=10.0,
+            ncs_with_carbon=True,
+            landuse_project=True,
+            landuse_normalized=True,
+            landuse_weighted=True,
+            highest_position=True,
+            base_dir=os.path.dirname(os.path.abspath(__file__)),
+        )
+
+        analysis_task = ScenarioAnalysisTask(
+            task_config= task_config,
+        )
+
+        base_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "data",
+            "activities",
+        )
+
+        scenario_directory = os.path.join(
+            f"{base_dir}",
+            f'scenario_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}'
+            f"_{str(uuid.uuid4())[:4]}",
+        )
+
+        analysis_task.scenario_directory = scenario_directory
+
+        # Before normalization, check if the activity layer stats are correct
+        activity_layer = QgsRasterLayer(test_activity.path, test_activity.name)
+        first_layer_stat = activity_layer.dataProvider().bandStatistics(1)
+
+        self.assertEqual(first_layer_stat.minimumValue, 0.0)
+        self.assertEqual(first_layer_stat.maximumValue, 1.0)
+
+        results = analysis_task.run_investability_analysis()
+
+        self.assertTrue(results)
+
+        self.assertIsInstance(results, bool)
+        self.assertTrue(results)
+
+        self.assertIsNotNone(test_activity.path)
+
+        result_layer = QgsRasterLayer(test_activity.path, test_activity.name)
+
+        result_stat = result_layer.dataProvider().bandStatistics(1)
+        self.assertAlmostEqual(result_stat.minimumValue, 0.825)
+        self.assertAlmostEqual(result_stat.maximumValue, 1.825)
+
+        self.assertTrue(result_layer.isValid())
+
+        self.assertTrue(BaseFileUtils.remove_dir(scenario_directory))
+
     def test_layer_snapping(self):
         """Test the layer snapping functionality."""
         activities_layer_directory = os.path.join(
