@@ -768,7 +768,7 @@ class ScenarioAnalysisTask(QgsTask):
                     )
                     continue
                     
-                if min_value >= 0 and max_value <= 1:                        
+                if min_value == 0 and max_value == 1:
                     new_path = BaseFileUtils.copy_file(activity.path, normalized_activities_directory)
                     if new_path and os.path.exists(new_path):
                         activity.path = new_path
