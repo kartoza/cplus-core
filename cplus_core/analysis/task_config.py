@@ -43,6 +43,7 @@ class TaskConfig(object):
     nodata_value = DEFAULT_VALUES.nodata_value
     clip_to_studyarea:bool = DEFAULT_VALUES.clip_to_studyarea
     relative_impact_matrix: typing.Dict = {}
+    activity_constant_rasters: typing.Dict = {}
 
     def __init__(
         self,
@@ -69,7 +70,8 @@ class TaskConfig(object):
         nodata_value=DEFAULT_VALUES.nodata_value,
         studyarea_path=None,
         clip_to_studyarea=False,
-        relative_impact_matrix={}
+        relative_impact_matrix={},
+        activity_constant_rasters={}
     ) -> None:
         """Initialize analysis task configuration.
 
@@ -145,6 +147,10 @@ class TaskConfig(object):
         :param relative_impact_matrix: Matrix of relative impact values
             between pathways and PWLs, defaults to empty dictionary
         :type relative_impact_matrix: typing.Dict, optional
+
+        :param activity_constant_rasters: Constant rasters for activities,
+            defaults to empty dictionary
+        :type activity_constant_rasters: typing.Dict, optional
         """
         self.scenario = scenario
         self.priority_layers = priority_layers
@@ -177,6 +183,7 @@ class TaskConfig(object):
         self.clip_to_studyarea = clip_to_studyarea
 
         self.relative_impact_matrix = relative_impact_matrix
+        self.activity_constant_rasters = activity_constant_rasters
 
     def get_activity(
             self, activity_uuid: str) -> typing.Union[Activity, None]:
@@ -268,7 +275,8 @@ class TaskConfig(object):
             "nodata_value": self.nodata_value,
             "studyarea_path": self.studyarea_path,
             "clip_to_studyarea": self.clip_to_studyarea,
-            "relative_impact_matrix": self.relative_impact_matrix
+            "relative_impact_matrix": self.relative_impact_matrix,
+            "activity_constant_rasters": self.activity_constant_rasters
         }
         for activity in self.scenario.activities:
             activity_dict = {
