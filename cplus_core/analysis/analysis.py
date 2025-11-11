@@ -37,6 +37,7 @@ from ..utils.helper import (
     clean_filename,
     tr,
     BaseFileUtils,
+    create_connectivity_raster,
 )
 from .task_config import TaskConfig
 
@@ -2993,6 +2994,66 @@ class ScenarioAnalysisTask(QgsTask):
 
         return True
     
+    def create_activity_connectivity_layer(self, activity: Activity) -> str | None:
+        """Create an activity connectivity layer for investability analysis
+
+        :param activity: Activity
+        :type activity: Activity
+
+        :returns: The path to the connectivity layer or None if the process failed
+        :rtype: str | None
+        """
+        if not activity.path:
+            self.log_message(
+                f"Problem when creating the connectivity layer, "
+                f"there is no map layer for the activity {activity.name}"
+            )
+            return None
+                
+        if not os.path.exists(activity.path):
+            self.log_message(
+                f"Problem when creating the connectivity layer, "
+                f"the map layer for the activity {activity.name} does not exist"
+            )
+            return None
+        
+        self.set_status_message(
+            tr(f"Creating connectivity layer for the activity: {activity.name}")
+        )
+
+        output_directory = os.path.join(
+            self.scenario_directory, "investable_activities"
+        )
+        BaseFileUtils.create_new_dir(output_directory)
+
+        output_path = os.path.join(
+                f"{output_directory}",
+                f"{Path(activity.path).stem}_connectivity_{str(uuid.uuid4())[:4]}.tif"
+            )
+        
+        try:                        
+            if self.processing_cancelled:
+                return None
+
+            ok, logs = create_connectivity_raster(activity.path, output_path)
+
+            if ok and os.path.exists(output_path):
+                return output_path
+            
+            self.log_message(
+                f" Error creating the connectivity layer for activity {activity.name}, "
+            )
+            for log in logs:
+                self.log_message(tr(log))
+            
+            return None
+
+        except Exception as e:
+            self.log_message(f"Problem creating connectivity layer for activity, {e} \n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)      
+        return None
+
     def run_investability_analysis(self) -> bool:
         """Run activity investability analysis
 
@@ -3034,14 +3095,30 @@ class ScenarioAnalysisTask(QgsTask):
                 expression_items = [f'("{activity_basename}@1")']
                 
                 constant_rasters = activity.constant_rasters
-                if not constant_rasters or len(constant_rasters) > 0:
+                if constant_rasters is None:
+                    constant_rasters = []
+                
+                if self.processing_cancelled:
+                    return False
+                
+                # Add connectivity layer
+                connectivity_path = self.create_activity_connectivity_layer(activity=activity, threshold=5)
+                if connectivity_path and os.path.exists(connectivity_path):
+                    constant_rasters.append(
+                        {
+                            "path": connectivity_path,
+                            "name": "Connectivity layer"
+                        }
+                    )
+                else:
+                    self.log_message(f"Invalid path for connectivity layer of activity {activity.name}")
+
+                if len(constant_rasters) == 0:
                     self.log_message(
                         f"No defined constant rasters, "
                         f"Skipping investability analysis for the activity {activity.name}"
                     )
-
-                if self.processing_cancelled:
-                    return False
+                    continue
                 
                 nr_constant_rasters = len(constant_rasters)
 
