@@ -38,6 +38,7 @@ from ..utils.helper import (
     tr,
     BaseFileUtils,
     create_connectivity_raster,
+    normalize_raster,
 )
 from .task_config import TaskConfig
 
@@ -3072,6 +3073,9 @@ class ScenarioAnalysisTask(QgsTask):
         )
         BaseFileUtils.create_new_dir(investable_activities)
 
+        self.feedback = QgsProcessingFeedback()
+        self.feedback.progressChanged.connect(self.update_progress)
+
         try:
             for activity in self.analysis_activities:
                 if activity.path is None or activity.path == "":
@@ -3107,7 +3111,8 @@ class ScenarioAnalysisTask(QgsTask):
                     constant_rasters.append(
                         {
                             "path": connectivity_path,
-                            "name": "Connectivity layer"
+                            "name": "Connectivity layer",
+                            "skip_raster": False
                         }
                     )
                 else:
@@ -3122,21 +3127,44 @@ class ScenarioAnalysisTask(QgsTask):
                 
                 nr_constant_rasters = len(constant_rasters)
 
-                for constant_raster in constant_rasters:                    
-                    constant_raster_layer = QgsRasterLayer(
-                        constant_raster.get("path", ""),
-                        constant_raster.get("name", "constant raster")
-                    )
-                    if not constant_raster_layer.isValid():
-                        self.log_message(
-                            f"Constant raster layer {constant_raster.get('name')} is not valid, "
-                            f"skipping the layer from investability analysis."
-                        )
-                        continue
+                for constant_raster in constant_rasters:
+                    if "normalized" in constant_raster:
+                        expression_items.append(f"{constant_raster.get('normalized')} / {nr_constant_rasters}")
+                    else:
+                        path = constant_raster.get("path", "")
+                        if not os.path.exists(path):
+                            self.log_message(
+                                f"Invalid constant raster path {path},"
+                                f"Skipping from the investability analysis for the activity {activity.name}"
+                            )
+                            continue
 
-                    layers.append(constant_raster.get("path"))
-                    expression_items.append(
-                        f'("{Path(constant_raster.get("path")).stem}@1" / {nr_constant_rasters})')
+                        normalized_path = os.path.join(
+                            f"{investable_activities}",
+                            f"{Path(path).stem}_norm_{str(uuid.uuid4())[:4]}.tif"
+                        )
+
+                        if self.processing_cancelled:
+                            return False
+
+                        ok, log = normalize_raster(
+                            input_raster_path=path,
+                            output_raster_path=normalized_path,
+                            processing_context=self.processing_context,
+                            feedback=self.feedback,
+                        )
+                        self.log_message(log)
+                        if not ok:                            
+                            self.log_message(
+                                f"Skipping {path} from the investability analysis for the activity {activity.name}"
+                            )
+                            continue
+
+                        if os.path.exists(normalized_path):
+                            path = normalized_path
+
+                        layers.append(path)
+                        expression_items.append(f'("{Path(path).stem}@1" / {nr_constant_rasters})')                       
                 
                 output_path = os.path.join(
                     f"{investable_activities}",
@@ -3155,9 +3183,6 @@ class ScenarioAnalysisTask(QgsTask):
                     f" Used parameters for calculating investability for activity {activity.name}, "
                     f"{alg_params} \n"
                 )
-
-                self.feedback = QgsProcessingFeedback()
-                self.feedback.progressChanged.connect(self.update_progress)
 
                 if self.processing_cancelled:
                     return False
