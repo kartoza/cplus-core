@@ -28,8 +28,11 @@ from qgis.core import (
     Qgis,
     QgsRasterPipe,
     QgsRasterDataProvider,
-    QgsRasterFileWriter
+    QgsRasterFileWriter,
+    QgsProcessingContext,
+    QgsProcessingFeedback,
 )
+from qgis import processing
 
 from qgis.analysis import QgsAlignRaster
 
@@ -318,6 +321,7 @@ def unique_path_from_reference(reference_path: str) -> str:
     new_filename = f"{name}_{uuid.uuid4().hex}{ext}"
     return os.path.join(directory, new_filename)
 
+
 def array_from_raster(input_layer: QgsRasterLayer):
     """
     Read a raster and return the pixel values as numpy array
@@ -339,6 +343,7 @@ def array_from_raster(input_layer: QgsRasterLayer):
             array[i, j] = block.value(i, j)
 
     return array
+
 
 def raster_from_array(
         array, 
@@ -443,6 +448,7 @@ def raster_from_array(
     raster_layer.setCrs(crs)
 
     return raster_layer
+
 
 def create_connectivity_raster(
     input_raster_path: str,
@@ -633,3 +639,67 @@ def create_connectivity_raster(
         logs.append(traceback.format_exc())
 
     return False, logs
+
+
+def normalize_raster(
+    input_raster_path: str,
+    output_raster_path: str,
+    processing_context: QgsProcessingContext = None,
+    feedback: QgsProcessingFeedback = None
+):
+    """
+    Create a normalized input raster
+
+    :param input_raster_path: Input layer path
+    :type input_raster_path: str
+
+    :param output_raster_path: Output layer path
+    :type output_raster_path: str
+
+    :param processing_context: Qgis processing context
+    :type processing_context: QgsProcessingContext, default None
+
+    :param feedback: Qgis processing feedback
+    :type feedback: QgsProcessingFeedback
+    """
+    try:
+        input_raster_layer = QgsRasterLayer(input_raster_path, "Input Raster")
+
+        if not input_raster_layer.isValid():
+            return False, f"Invalid raster layer {input_raster_path}"
+        
+        provider = input_raster_layer.dataProvider()
+        band_statistics = provider.bandStatistics(1)
+        min_value = band_statistics.minimumValue
+        max_value = band_statistics.maximumValue
+
+        if min_value is None or max_value is None:
+            return False, f"Raster layer has no valid statistics, {input_raster_path}"
+        
+        if min_value >= 0 and max_value <= 1:
+            return True, f"Layer is already normalized (min={min_value}, max={max_value})"
+        
+
+        expression = f"(A - {min_value}) / ({max_value} - {min_value})"
+
+        alg_params = {
+            'INPUT_A': input_raster_path,
+            "BAND_A": 1,
+            'FORMULA': expression,
+            'OPTIONS':'COMPRESS=DEFLATE|ZLEVEL=6|TILED=YES',
+            'OUTPUT': output_raster_path,
+        }
+
+        result = processing.run(
+            "gdal:rastercalculator",
+            alg_params,
+            context=processing_context,
+            feedback=feedback,
+        )
+
+        if result.get("OUTPUT"):
+            return True, f"Normalized raster saved to : {output_raster_path}"
+    
+    except Exception as e:
+        return False, f"Problem normalizing pathways, {e} \n"
+    
