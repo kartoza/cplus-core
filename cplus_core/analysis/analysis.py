@@ -3117,19 +3117,20 @@ class ScenarioAnalysisTask(QgsTask):
                     )
                 else:
                     self.log_message(f"Invalid path for connectivity layer of activity {activity.name}")
-
-                if len(constant_rasters) == 0:
+                
+                nr_constant_rasters = len(constant_rasters)
+                if nr_constant_rasters == 0:
                     self.log_message(
                         f"No defined constant rasters, "
                         f"Skipping investability analysis for the activity {activity.name}"
                     )
-                    continue
-                
-                nr_constant_rasters = len(constant_rasters)
+                    continue                
 
                 for constant_raster in constant_rasters:
                     if "normalized" in constant_raster:
-                        expression_items.append(f"{constant_raster.get('normalized')} / {nr_constant_rasters}")
+                        expression_items.append(
+                            str(constant_raster.get('normalized') / nr_constant_rasters)
+                        )
                     else:
                         path = constant_raster.get("path", "")
                         if not os.path.exists(path):
