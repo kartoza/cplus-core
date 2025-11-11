@@ -3102,7 +3102,7 @@ class ScenarioAnalysisTask(QgsTask):
                     return False
                 
                 # Add connectivity layer
-                connectivity_path = self.create_activity_connectivity_layer(activity=activity, threshold=5)
+                connectivity_path = self.create_activity_connectivity_layer(activity=activity)
                 if connectivity_path and os.path.exists(connectivity_path):
                     constant_rasters.append(
                         {
