@@ -37,6 +37,8 @@ from ..utils.helper import (
     clean_filename,
     tr,
     BaseFileUtils,
+    create_connectivity_raster,
+    normalize_raster,
 )
 from .task_config import TaskConfig
 
@@ -412,6 +414,10 @@ class ScenarioAnalysisTask(QgsTask):
             temporary_output=not save_output
         )
 
+        # Investability
+        self.run_investability_analysis()
+        
+
         # The highest position tool analysis
         save_output = self.get_settings_value(
             Settings.HIGHEST_POSITION, default=True, setting_type=bool
@@ -658,7 +664,7 @@ class ScenarioAnalysisTask(QgsTask):
                         )
                         continue
                     
-                    if min_value >= 0 and max_value <= 1:                        
+                    if min_value == 0 and max_value == 1:                        
                         new_path = BaseFileUtils.copy_file(pathway.path, normalized_pathways_directory)
                         if new_path and os.path.exists(new_path):
                             pathway.path = new_path
@@ -764,7 +770,7 @@ class ScenarioAnalysisTask(QgsTask):
                     )
                     continue
                     
-                if min_value >= 0 and max_value <= 1:                        
+                if min_value == 0 and max_value == 1:
                     new_path = BaseFileUtils.copy_file(activity.path, normalized_activities_directory)
                     if new_path and os.path.exists(new_path):
                         activity.path = new_path
@@ -2987,6 +2993,220 @@ class ScenarioAnalysisTask(QgsTask):
             self.cancel_task(e)
             return False
 
+        return True
+    
+    def create_activity_connectivity_layer(self, activity: Activity):
+        """Create an activity connectivity layer for investability analysis
+
+        :param activity: Activity
+        :type activity: Activity
+
+        :returns: The path to the connectivity layer or None if the process failed
+        :rtype: str | None
+        """
+        if not activity.path:
+            self.log_message(
+                f"Problem when creating the connectivity layer, "
+                f"there is no map layer for the activity {activity.name}"
+            )
+            return None
+                
+        if not os.path.exists(activity.path):
+            self.log_message(
+                f"Problem when creating the connectivity layer, "
+                f"the map layer for the activity {activity.name} does not exist"
+            )
+            return None
+        
+        self.set_status_message(
+            tr(f"Creating connectivity layer for the activity: {activity.name}")
+        )
+
+        output_directory = os.path.join(
+            self.scenario_directory, "investable_activities"
+        )
+        BaseFileUtils.create_new_dir(output_directory)
+
+        output_path = os.path.join(
+                output_directory,
+                f"{Path(activity.path).stem}_connectivity_{str(uuid.uuid4())[:4]}.tif"
+            )
+        
+        try:                        
+            if self.processing_cancelled:
+                return None
+
+            ok, logs = create_connectivity_raster(activity.path, output_path)
+
+            if ok and os.path.exists(output_path):
+                return output_path
+            
+            self.log_message(
+                f" Error creating the connectivity layer for activity {activity.name}, "
+            )
+            for log in logs:
+                self.log_message(tr(log))
+            
+            return None
+
+        except Exception as e:
+            self.log_message(f"Problem creating connectivity layer for activity, {e} \n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)      
+        return None
+
+    def run_investability_analysis(self) -> bool:
+        """Run activity investability analysis
+
+        :returns: True if the task operation was successfully completed else False.
+        :rtype: bool
+        """
+        if self.processing_cancelled:
+            return False
+
+        self.set_status_message(
+            tr("Calculating investability of the activities")
+        )
+
+        investable_activities = os.path.join(
+            self.scenario_directory, "investable_activities"
+        )
+        BaseFileUtils.create_new_dir(investable_activities)
+
+        self.feedback = QgsProcessingFeedback()
+        self.feedback.progressChanged.connect(self.update_progress)
+
+        try:
+            for activity in self.analysis_activities:
+                if activity.path is None or activity.path == "":
+                    self.log_message(
+                        f"Problem when running activity investability, "
+                        f"there is no map layer for the activity {activity.name}"
+                    )
+
+                    return False
+                
+                if not os.path.exists(activity.path):
+                    self.log_message(
+                        f"Problem when running activity investability, "
+                        f"the map layer for the activity {activity.name} does not exist"
+                    )
+                    return False
+                
+                layers = [activity.path]
+
+                activity_basename = Path(activity.path).stem
+                expression_items = [f'("{activity_basename}@1")']
+                
+                constant_rasters = activity.constant_rasters
+                if constant_rasters is None:
+                    constant_rasters = []
+                
+                if self.processing_cancelled:
+                    return False
+                
+                # Add connectivity layer
+                connectivity_path = self.create_activity_connectivity_layer(activity=activity)
+                if connectivity_path and os.path.exists(connectivity_path):
+                    constant_rasters.append(
+                        {
+                            "path": connectivity_path,
+                            "name": "Connectivity layer",
+                            "skip_raster": False
+                        }
+                    )
+                else:
+                    self.log_message(f"Invalid path for connectivity layer of activity {activity.name}")
+                
+                nr_constant_rasters = len(constant_rasters)
+                if nr_constant_rasters == 0:
+                    self.log_message(
+                        f"No defined constant rasters, "
+                        f"Skipping investability analysis for the activity {activity.name}"
+                    )
+                    continue                
+
+                for constant_raster in constant_rasters:
+                    if "normalized" in constant_raster:
+                        expression_items.append(
+                            str(constant_raster.get('normalized') / nr_constant_rasters)
+                        )
+                    else:
+                        path = constant_raster.get("path", "")
+                        if not os.path.exists(path):
+                            self.log_message(
+                                f"Invalid constant raster path {path},"
+                                f"Skipping from the investability analysis for the activity {activity.name}"
+                            )
+                            continue
+
+                        normalized_path = os.path.join(
+                            f"{investable_activities}",
+                            f"{Path(path).stem}_norm_{str(uuid.uuid4())[:4]}.tif"
+                        )
+
+                        if self.processing_cancelled:
+                            return False
+
+                        ok, log = normalize_raster(
+                            input_raster_path=path,
+                            output_raster_path=normalized_path,
+                            processing_context=self.processing_context,
+                            feedback=self.feedback,
+                        )
+                        self.log_message(log)
+                        if not ok:                            
+                            self.log_message(
+                                f"Skipping {path} from the investability analysis for the activity {activity.name}"
+                            )
+                            continue
+
+                        if os.path.exists(normalized_path):
+                            path = normalized_path
+
+                        layers.append(path)
+                        expression_items.append(f'("{Path(path).stem}@1" / {nr_constant_rasters})')                       
+                
+                output_path = os.path.join(
+                    investable_activities,
+                    f"{Path(activity.path).stem}_invest_{str(uuid.uuid4())[:4]}.tif"
+                )
+
+                alg_params = {
+                    "CELLSIZE": 0,
+                    "CRS": None,
+                    "EXPRESSION": " + ".join(expression_items),
+                    "LAYERS": layers,
+                    "OUTPUT": output_path,
+                }
+
+                self.log_message(
+                    f" Used parameters for calculating investability for activity {activity.name}, "
+                    f"{alg_params} \n"
+                )
+
+                if self.processing_cancelled:
+                    return False
+
+                result = processing.run(
+                    "qgis:rastercalculator",
+                    alg_params,
+                    context=self.processing_context,
+                    feedback=self.feedback,
+                )
+
+                if result.get("OUTPUT"):
+                    activity.path = result.get("OUTPUT")
+                else:
+                    self.log_message(
+                        f"Problem calculating investability for activity {activity.name}"
+                    )                
+        except Exception as e:
+            self.log_message(f"Problem calculating activity investability, {e} \n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)
+            return False
+        
         return True
 
     def run_highest_position_analysis(self, temporary_output: bool =False):

@@ -385,6 +385,7 @@ class Activity(LayerModelComponent):
     layer_styles: dict = dataclasses.field(default_factory=dict)
     mask_paths: typing.List[str] = dataclasses.field(default_factory=list)
     style_pixel_value: int = -1
+    constant_rasters: typing.List[typing.Dict] = dataclasses.field(default_factory=list)
 
     @classmethod
     def from_dict(cls, activity_dict: typing.Dict):
