@@ -3028,7 +3028,7 @@ class ScenarioAnalysisTask(QgsTask):
         BaseFileUtils.create_new_dir(output_directory)
 
         output_path = os.path.join(
-                f"{output_directory}",
+                output_directory,
                 f"{Path(activity.path).stem}_connectivity_{str(uuid.uuid4())[:4]}.tif"
             )
         
