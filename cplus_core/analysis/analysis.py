@@ -3168,7 +3168,7 @@ class ScenarioAnalysisTask(QgsTask):
                         expression_items.append(f'("{Path(path).stem}@1" / {nr_constant_rasters})')                       
                 
                 output_path = os.path.join(
-                    f"{investable_activities}",
+                    investable_activities,
                     f"{Path(activity.path).stem}_invest_{str(uuid.uuid4())[:4]}.tif"
                 )
 
