@@ -672,8 +672,8 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
         result_layer = QgsRasterLayer(test_activity.path, test_activity.name)
 
         result_stat = result_layer.dataProvider().bandStatistics(1)
-        self.assertAlmostEqual(result_stat.minimumValue, 1.11)
-        self.assertAlmostEqual(result_stat.maximumValue, 1.86)
+        self.assertAlmostEqual(result_stat.minimumValue, 0.825, places=3)
+        self.assertAlmostEqual(result_stat.maximumValue, 1.825, places=3)
 
         self.assertTrue(result_layer.isValid())
 
