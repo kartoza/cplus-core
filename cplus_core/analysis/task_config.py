@@ -44,6 +44,7 @@ class TaskConfig(object):
     clip_to_studyarea:bool = DEFAULT_VALUES.clip_to_studyarea
     relative_impact_matrix: typing.Dict = {}
     activity_constant_rasters: typing.Dict = {}
+    pixel_connectivity_enabled = DEFAULT_VALUES.pixel_connectivity_enabled
 
     def __init__(
         self,
@@ -71,7 +72,8 @@ class TaskConfig(object):
         studyarea_path=None,
         clip_to_studyarea=False,
         relative_impact_matrix={},
-        activity_constant_rasters={}
+        activity_constant_rasters={},
+        pixel_connectivity_enabled=DEFAULT_VALUES.pixel_connectivity_enabled
     ) -> None:
         """Initialize analysis task configuration.
 
@@ -151,6 +153,10 @@ class TaskConfig(object):
         :param activity_constant_rasters: Constant rasters for activities,
             defaults to empty dictionary
         :type activity_constant_rasters: typing.Dict, optional
+
+        :param pixel_connectivity_enabled: Enable pixel connectivity analysis
+            defaults to True
+        :type pixel_connectivity_enabled: bool, optional
         """
         self.scenario = scenario
         self.priority_layers = priority_layers
@@ -184,6 +190,8 @@ class TaskConfig(object):
 
         self.relative_impact_matrix = relative_impact_matrix
         self.activity_constant_rasters = activity_constant_rasters
+
+        self.pixel_connectivity_enabled = pixel_connectivity_enabled
 
     def get_activity(
             self, activity_uuid: str) -> typing.Union[Activity, None]:
@@ -276,7 +284,8 @@ class TaskConfig(object):
             "studyarea_path": self.studyarea_path,
             "clip_to_studyarea": self.clip_to_studyarea,
             "relative_impact_matrix": self.relative_impact_matrix,
-            "activity_constant_rasters": self.activity_constant_rasters
+            "activity_constant_rasters": self.activity_constant_rasters,
+            "pixel_connectivity_enabled": self.pixel_connectivity_enabled
         }
         for activity in self.scenario.activities:
             activity_dict = {

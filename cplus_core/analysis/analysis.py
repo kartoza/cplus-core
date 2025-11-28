@@ -3199,18 +3199,19 @@ class ScenarioAnalysisTask(QgsTask):
                 if self.processing_cancelled:
                     return False
                 
-                # Add connectivity layer
-                connectivity_path = self.create_activity_connectivity_layer(activity=activity)
-                if connectivity_path and os.path.exists(connectivity_path):
-                    constant_rasters.append(
-                        {
-                            "path": connectivity_path,
-                            "name": "Connectivity layer",
-                            "skip_raster": False
-                        }
-                    )
-                else:
-                    self.log_message(f"Invalid path for connectivity layer of activity {activity.name}")
+                if self.task_config.pixel_connectivity_enabled:
+                    # Add connectivity layer
+                    connectivity_path = self.create_activity_connectivity_layer(activity=activity)
+                    if connectivity_path and os.path.exists(connectivity_path):
+                        constant_rasters.append(
+                            {
+                                "path": connectivity_path,
+                                "name": "Connectivity layer",
+                                "skip_raster": False
+                            }
+                        )
+                    else:
+                        self.log_message(f"Invalid path for connectivity layer of activity {activity.name}")
                 
                 nr_constant_rasters = len(constant_rasters)
                 if nr_constant_rasters == 0:

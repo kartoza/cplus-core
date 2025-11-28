@@ -633,6 +633,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             landuse_weighted=True,
             highest_position=True,
             base_dir=os.path.dirname(os.path.abspath(__file__)),
+            pixel_connectivity_enabled=False
         )
 
         analysis_task = ScenarioAnalysisTask(
