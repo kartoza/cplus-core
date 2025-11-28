@@ -51,3 +51,5 @@ class Settings(enum.Enum):
     HIGHEST_POSITION = "highest_position"
 
     STUDYAREA_PATH = "studyarea_path"
+
+    PIXEL_CONNECTIVITY_ENABLED = "pixel_connectivity_enabled"

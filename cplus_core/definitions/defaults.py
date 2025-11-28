@@ -28,4 +28,4 @@ class DEFAULT_VALUES(object):
     highest_position = True
     nodata_value = -9999.0
     clip_to_studyarea = False
-    pixel_connectivity_enabled = True
+    pixel_connectivity_enabled = False

@@ -44,7 +44,7 @@ class TaskConfig(object):
     clip_to_studyarea:bool = DEFAULT_VALUES.clip_to_studyarea
     relative_impact_matrix: typing.Dict = {}
     activity_constant_rasters: typing.Dict = {}
-    pixel_connectivity_enabled = DEFAULT_VALUES.pixel_connectivity_enabled
+    pixel_connectivity_enabled: bool = DEFAULT_VALUES.pixel_connectivity_enabled
 
     def __init__(
         self,
@@ -73,7 +73,7 @@ class TaskConfig(object):
         clip_to_studyarea=False,
         relative_impact_matrix={},
         activity_constant_rasters={},
-        pixel_connectivity_enabled=DEFAULT_VALUES.pixel_connectivity_enabled
+        pixel_connectivity_enabled=False
     ) -> None:
         """Initialize analysis task configuration.
 
