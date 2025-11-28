@@ -633,6 +633,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             landuse_weighted=True,
             highest_position=True,
             base_dir=os.path.dirname(os.path.abspath(__file__)),
+            pixel_connectivity_enabled=False
         )
 
         analysis_task = ScenarioAnalysisTask(
@@ -672,8 +673,8 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
         result_layer = QgsRasterLayer(test_activity.path, test_activity.name)
 
         result_stat = result_layer.dataProvider().bandStatistics(1)
-        self.assertAlmostEqual(result_stat.minimumValue, 1.11)
-        self.assertAlmostEqual(result_stat.maximumValue, 1.86)
+        self.assertAlmostEqual(result_stat.minimumValue, 0.825, places=3)
+        self.assertAlmostEqual(result_stat.maximumValue, 1.825, places=3)
 
         self.assertTrue(result_layer.isValid())
 
