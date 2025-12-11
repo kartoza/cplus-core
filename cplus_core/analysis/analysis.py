@@ -1162,15 +1162,16 @@ class ScenarioAnalysisTask(QgsTask):
             ]
             pathways_carbon_value = [v for v in pathways_carbon_value if v is not None]
 
+            if len(pathways_carbon_value) == 0:
+                self.log_message("No manage or restore pathways")
+                return False
+            
             # Calculate min/max for each pathway type
-
-            carbon_stats = {}
-            if len(pathways_carbon_value) > 0:
-                carbon_stats = {
-                    "min": min(pathways_carbon_value),
-                    "max": max(pathways_carbon_value),
-                    "range": max(pathways_carbon_value) - min(pathways_carbon_value),
-                }                    
+            carbon_stats = {
+                "min": min(pathways_carbon_value),
+                "max": max(pathways_carbon_value),
+                "range": max(pathways_carbon_value) - min(pathways_carbon_value),
+            }                    
             
             # Normalize carbon impact for each pathway
             for pathway in pathways:   
