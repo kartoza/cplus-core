@@ -73,6 +73,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             description="test_description",
             path=pathway_layer_path,
             priority_layers=[],
+            suitability_index=0.5,
         )
 
         test_layer = QgsRasterLayer(test_pathway.path, test_pathway.name)
@@ -118,7 +119,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
-            pathway_suitability_index=0.5,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -196,6 +196,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             name="second_test_pathway",
             description="second_test_description",
             path=pathway_layer_path_2,
+            suitability_index=1.0,
         )
 
         first_test_layer = QgsRasterLayer(
@@ -240,7 +241,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
-            pathway_suitability_index=1.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -355,7 +355,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -468,7 +467,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -623,7 +621,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0,
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -741,7 +738,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=True,
             snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -805,7 +801,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=True,
             snap_method=0,
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -865,6 +860,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             description="test_description",
             path=pathway_layer_path_1,
             priority_layers=[],
+            suitability_index=0.0,
         )
 
         test_activity = Activity(
@@ -901,7 +897,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0,
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
@@ -960,6 +955,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             description="test_description",
             path=pathway_layer_path_1,
             priority_layers=[],
+            suitability_index=0.0,
         )
 
         test_activity = Activity(
@@ -1001,7 +997,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
