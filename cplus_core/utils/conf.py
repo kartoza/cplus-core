@@ -20,9 +20,6 @@ class Settings(enum.Enum):
     # Coefficient for carbon layers
     CARBON_COEFFICIENT = "carbon_coefficient"
 
-    # Pathway suitability index value
-    PATHWAY_SUITABILITY_INDEX = "pathway_suitability_index"
-
     # Snapping values
     SNAPPING_ENABLED = "snapping_enabled"
     SNAP_LAYER = "snap_layer"
