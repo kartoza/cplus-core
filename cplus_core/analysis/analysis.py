@@ -994,6 +994,13 @@ class ScenarioAnalysisTask(QgsTask):
         pathways: typing.List[NcsPathway] = []
 
         try:
+            aoi_layer = QgsVectorLayer(studyarea_path, "aoi_layer")
+            if not aoi_layer.isValid():
+                self.log_message(
+                        f"Invalid Study Area Layer {studyarea_path}"
+                    )
+                return False
+            
             for activity in self.analysis_activities:
                 if not activity.pathways and (
                     activity.path is None or activity.path == ""
