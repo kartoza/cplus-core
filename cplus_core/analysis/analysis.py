@@ -33,7 +33,7 @@ from ..utils.conf import Settings
 from ..definitions.defaults import (
     SCENARIO_OUTPUT_FILE_NAME, DEFAULT_VALUES
 )
-from ..models.base import ScenarioResult, Activity, NcsPathway
+from ..models.base import ScenarioResult, Activity, NcsPathway, NcsPathwayType
 from ..utils.helper import (
     align_rasters,
     clean_filename,
@@ -822,6 +822,70 @@ class ScenarioAnalysisTask(QgsTask):
             self.cancel_task(e)
             return False
     
+    def _can_clip_raster_by_mask(
+        self, raster_layer: QgsRasterLayer, mask_layer: QgsVectorLayer
+    ) -> bool:
+        """
+        Check if the raster layer can be clipped by the mask layer.
+
+        Conditions:
+            1. The difference in area of the extent of the raster and
+                vector layer should be greater than 15%
+            2. The mask layer should be intersecting the raster layer
+
+        :param raster_layer: Raster layer
+        :type raster_layer: QgsRasterLayer
+
+        :param mask_layer: Masking layer
+        :type mask_layer: QgsVectorLayer
+
+        :returns: True if the check is successful else False.
+        :rtype: bool
+        """
+        # Check if raster and mask layer is valid
+
+        if not mask_layer.isValid() or not raster_layer.isValid():
+            self.log_message(
+                "Cancelling clipping raster, the mask layer or"
+                " the raster layer is invalid."
+            )
+            self.cancel_task()
+            return False
+
+        # Reproject the masklayer if its CRS is different from the raster CRS
+        if mask_layer.crs() != raster_layer.crs():
+            mask_path_reprojected = self.reproject_layer(
+                mask_layer.source(), raster_layer.crs(), is_raster=False
+            )
+            if mask_path_reprojected and os.path.exists(mask_path_reprojected):
+                mask_layer = QgsVectorLayer(
+                    mask_path_reprojected, "mask_layer_reprojected"
+                )
+
+        # If mask layer intersects the raster layer
+        if not mask_layer.extent().intersects(raster_layer.extent()):
+            self.log_message(
+                "Cancelling clipping raster, the mask layer extent"
+                " and the raster extent do not overlap."
+            )
+            self.cancel_task()
+            return False
+
+        mask_extent_area = mask_layer.extent().area()
+        raster_extent_area = raster_layer.extent().area()
+
+        area_difference = abs(mask_extent_area - raster_extent_area)
+
+        # Check if the difference in area greater than 15% of the raster layer extent
+        if (area_difference/raster_extent_area) <= 0.15:
+            self.log_message(
+                "Skipping clipping raster layer, "
+                "the mask layer extent is within 15 percent of the raster layer extent"
+            )
+            return False
+
+        return True
+
     def clip_raster_by_mask(self, 
         input_raster_path: str,
         mask_layer_path: str,
@@ -930,6 +994,13 @@ class ScenarioAnalysisTask(QgsTask):
         pathways: typing.List[NcsPathway] = []
 
         try:
+            aoi_layer = QgsVectorLayer(studyarea_path, "aoi_layer")
+            if not aoi_layer.isValid():
+                self.log_message(
+                        f"Invalid Study Area Layer {studyarea_path}"
+                    )
+                return False
+            
             for activity in self.analysis_activities:
                 if not activity.pathways and (
                     activity.path is None or activity.path == ""
@@ -967,6 +1038,12 @@ class ScenarioAnalysisTask(QgsTask):
                         f"Clipping the {pathway.name} pathway layer by "
                         f"the study area layer\n"
                     )
+
+                    if not self._can_clip_raster_by_mask(pathway_layer, aoi_layer):
+                        continue
+
+                    if self.processing_cancelled:
+                        return False
 
                     output_file = os.path.join(
                         clipped_pathways_directory,
@@ -1019,6 +1096,12 @@ class ScenarioAnalysisTask(QgsTask):
                                 )
                                 continue
 
+                            if not self._can_clip_raster_by_mask(layer, aoi_layer):
+                                continue
+
+                            if self.processing_cancelled:
+                                return False
+
                             self.log_message(
                                 f"Clipping the {priority_layer.get('name')} priority layer "
                                 f"by study area layer\n"
@@ -1046,6 +1129,75 @@ class ScenarioAnalysisTask(QgsTask):
 
         return True
 
+    def run_normalize_pathways_carbon_impact(
+        self,
+        pathways: typing.List[NcsPathway]
+    ) -> bool:
+        """Normalizes the total carbon impact for the pathways grouped by the pathway type
+
+        :param pathways: List of the pathways
+        :type pathways: typing.List[NcsPathway]
+
+        :returns: True if the task operation was successfully completed else False.
+        :rtype: bool
+        """
+        if self.processing_cancelled:
+            return False
+
+        self.log_message(tr(f"Normalizing Total Carbon Impact for Pathways"))
+
+        if len(pathways) == 0:
+            msg = tr(f"No defined pathways for running normalize total carbon impact.")
+            self.set_info_message(
+                msg,
+                level=Qgis.Critical,
+            )
+            self.log_message(msg)
+            return False
+
+        try:
+            # Group the manage and protect pathways and collect carbon impact values
+            pathways_carbon_value = [
+                p.type_options.get("carbon_impact", 0) for p in pathways if p.pathway_type in (NcsPathwayType.MANAGE,  NcsPathwayType.RESTORE)
+            ]
+            pathways_carbon_value = [v for v in pathways_carbon_value if v is not None]
+
+            if len(pathways_carbon_value) == 0:
+                self.log_message("No manage or restore pathways")
+                return False
+            
+            # Calculate min/max for each pathway type
+            carbon_stats = {
+                "min": min(pathways_carbon_value),
+                "max": max(pathways_carbon_value),
+                "range": max(pathways_carbon_value) - min(pathways_carbon_value),
+            }                    
+            
+            # Normalize carbon impact for each pathway
+            for pathway in pathways:   
+                # Ignore protect pathways             
+                if pathway.pathway_type not in (NcsPathwayType.MANAGE,  NcsPathwayType.RESTORE):
+                    continue
+                
+                carbon_impact = pathway.type_options.get("carbon_impact")
+                if carbon_impact is None:
+                    continue
+                
+                if carbon_stats["range"] == 0:
+                    # All values are the same carbon impact
+                    norm_carbon_impact = 1 / len(pathways_carbon_value)
+                else:
+                    norm_carbon_impact = (carbon_impact - carbon_stats["min"]) / carbon_stats["range"]
+                
+                pathway.type_options.update({"norm_carbon_impact": norm_carbon_impact})
+                    
+            return True
+        except Exception as e:
+            self.log_message(f"Problem normalizing pathways carbon impact, {e}\n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)            
+            return False
+        
     def run_pathways_weighting(
         self,
         priority_layers_groups: dict,
@@ -1086,16 +1238,16 @@ class ScenarioAnalysisTask(QgsTask):
             self.log_message(msg)
             return False
 
-        # Get relative impact matrix items
-        pathway_uuids = self.relative_impact_matrix.get("pathway_uuids", [])
-        priority_layer_uuids = self.relative_impact_matrix.get("priority_layer_uuids", [])
-        relative_impact_values = self.relative_impact_matrix.get("values", [])
-        
-        # Get valid pathways
-        pathways: typing.List[NcsPathway] = []
-        activities_paths = []
-
         try:
+            # Get relative impact matrix items
+            pathway_uuids = self.relative_impact_matrix.get("pathway_uuids", [])
+            priority_layer_uuids = self.relative_impact_matrix.get("priority_layer_uuids", [])
+            relative_impact_values = self.relative_impact_matrix.get("values", [])
+            
+            # Get valid pathways
+            pathways: typing.List[NcsPathway] = []
+            activities_paths = []
+
             # Validate activities and corresponding pathways
             for activity in self.analysis_activities:
                 if not activity.pathways and (
@@ -1124,6 +1276,8 @@ class ScenarioAnalysisTask(QgsTask):
             if not pathways and len(activities_paths) > 0:
                 self.run_activities_analysis(self.analysis_activities, extent)
                 return False
+
+            self.run_normalize_pathways_carbon_impact(pathways)
 
             suitability_index = float(
                 self.get_settings_value(
@@ -1215,8 +1369,8 @@ class ScenarioAnalysisTask(QgsTask):
                                         )
                                         impact_value = None
 
-                                value = group.get("value")
-                                priority_group_coefficient = float(value)
+                                user_weight = group.get("value")
+                                priority_group_coefficient = float(user_weight)
                                 if priority_group_coefficient > 0:
                                     if pwl not in layers:
                                         layers.append(pwl)
@@ -1226,17 +1380,22 @@ class ScenarioAnalysisTask(QgsTask):
                                         f'"{pwl_path_basename}@1")'
                                     )
 
-                                    if impact_value is not None:                                        
-                                        pwl_expression = (
-                                            f'({priority_group_coefficient * int(impact_value)}*'
-                                            f'"{pwl_path_basename}@1")'
-                                        )
+                                    if impact_value is not None and impact_value < 0:  
                                         # Inverse the PWL
-                                        if impact_value < 0:
-                                            pwl_expression = (
-                                                f'({priority_group_coefficient * abs(int(impact_value))}*'
-                                                f'("{pwl_path_basename}@1" - 1) * -1)'
+                                        pwl_expression = (
+                                            f'({priority_group_coefficient}*'
+                                            f'("{pwl_path_basename}@1" - 1) * -1)'
                                         )
+                                
+                                    norm_carbon_impact = pathway.type_options.get("norm_carbon_impact")
+                                    if layer.get("is_carbon") and norm_carbon_impact is not None:
+                                        # For restore and manage pathways, multiply by normalized carbon impact
+                                        pwl_expression += f' * {abs(int(impact_value)) * norm_carbon_impact}'
+                                    elif impact_value is not None:
+                                        # For non-carbon PWLS and and protect pathways,
+                                        #  multiply by impact weight from the matrix
+                                        pwl_expression += f'* {abs(int(impact_value))}'
+                                        
                                     base_names.append(pwl_expression)
                                     if not run_calculation:
                                         run_calculation = True
@@ -1294,8 +1453,8 @@ class ScenarioAnalysisTask(QgsTask):
 
         except Exception as e:
             self.log_message(f"Problem weighting pathways, {e}\n")
-            self.cancel_task(e)
             self.log_message(traceback.format_exc())
+            self.cancel_task(e)            
             return False
 
         return True
@@ -1571,7 +1730,8 @@ class ScenarioAnalysisTask(QgsTask):
             input_path: str,
             target_crs: QgsCoordinateReferenceSystem,
             output_directory: str = None,
-            target_extent: str = None
+            target_extent: str = None,
+            is_raster: bool = True
             ) -> str:
         
         """Reprojects the input layer to the target CRS and saves it in the
@@ -1584,6 +1744,8 @@ class ScenarioAnalysisTask(QgsTask):
         :type output_directory: str, optional
         :param target_extent: Target extent, defaults to None
         :type target_extent: str, optional
+        :param is_raster: Check if layer is raster, defaults to True
+        :type is_raster: bool, optional
         :returns: Path to the reprojected layer
         :rtype: str
         """
@@ -1597,9 +1759,10 @@ class ScenarioAnalysisTask(QgsTask):
         if output_directory is None:
             output_directory = Path(input_path).parent
         
+        ext = "tif" if is_raster else ".shp"
         output_file = os.path.join(
             output_directory,
-            f"{Path(input_path).stem}_{str(self.scenario.uuid)[:4]}.tif",
+            f"{Path(input_path).stem}_{str(self.scenario.uuid)[:4]}.{ext}",
         )
 
         alg_params = {
@@ -1623,7 +1786,7 @@ class ScenarioAnalysisTask(QgsTask):
             return None
 
         results = processing.run(
-            "gdal:warpreproject",
+            "gdal:warpreproject" if is_raster else "native:reprojectlayer",
             alg_params,
             context=self.processing_context,
             feedback=self.feedback,

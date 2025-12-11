@@ -314,6 +314,9 @@ class NcsPathway(LayerModelComponent):
     priority_layers: typing.List[typing.Dict] = dataclasses.field(default_factory=list)
     carbon_impact_value: float = None
 
+    # Additional properties based on the NCS pathway type
+    type_options: typing.Dict = dataclasses.field(default_factory=dict)
+
     def __eq__(self, other: "NcsPathway") -> bool:
         """Test equality of NcsPathway object with another
         NcsPathway object using the attributes.

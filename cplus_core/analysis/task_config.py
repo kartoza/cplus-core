@@ -307,6 +307,8 @@ class TaskConfig(object):
                         "path": pathway.path,
                         "layer_type": pathway.layer_type,
                         "priority_layers": pathway.priority_layers,
+                        "type_options": pathway.type_options,
+                        "pathway_type": pathway.pathway_type
                     }
                 )
             input_dict["activities"].append(activity_dict)
