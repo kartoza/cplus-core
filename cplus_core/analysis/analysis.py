@@ -853,7 +853,7 @@ class ScenarioAnalysisTask(QgsTask):
             return False
 
         # Reproject the masklayer if its CRS is different from the raster CRS
-        if mask_layer.crs() != raster_layer.crs:
+        if mask_layer.crs() != raster_layer.crs():
             mask_path_reprojected = self.reproject_layer(
                 mask_layer.source(), raster_layer.crs(), is_raster=False
             )
