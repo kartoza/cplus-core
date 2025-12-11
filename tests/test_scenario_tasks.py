@@ -955,6 +955,7 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             description="test_description",
             path=pathway_layer_path_1,
             priority_layers=[],
+            suitability_index=0.0,
         )
 
         test_activity = Activity(
@@ -996,7 +997,6 @@ class ScenarioAnalysisTaskTest(unittest.TestCase):
             mask_layers_paths=",".join(mask_layers_paths),
             snap_rescale=False,
             snap_method=0, # 0 = Nearest neighbour, 1 = Bilinear, 2 = Cubic
-            pathway_suitability_index=0.0,
             carbon_coefficient=1.0,
             sieve_enabled=False,
             sieve_threshold=10.0,
