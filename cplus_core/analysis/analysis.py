@@ -822,6 +822,70 @@ class ScenarioAnalysisTask(QgsTask):
             self.cancel_task(e)
             return False
     
+    def _can_clip_raster_by_mask(
+        self, raster_layer: QgsRasterLayer, mask_layer: QgsVectorLayer
+    ) -> bool:
+        """
+        Check if the raster layer can be clipped by the mask layer.
+
+        Conditions:
+            1. The difference in area of the extent of the raster and
+                vector layer should be greater than 15%
+            2. The mask layer should be intersecting the raster layer
+
+        :param raster_layer: Raster layer
+        :type raster_layer: QgsRasterLayer
+
+        :param mask_layer: Masking layer
+        :type mask_layer: QgsVectorLayer
+
+        :returns: True if the check is successful else False.
+        :rtype: bool
+        """
+        # Check if raster and mask layer is valid
+
+        if not mask_layer.isValid() or not raster_layer.isValid():
+            self.log_message(
+                "Cancelling clipping raster, the mask layer or"
+                " the raster layer is invalid."
+            )
+            self.cancel_task()
+            return False
+
+        # Reproject the masklayer if its CRS is different from the raster CRS
+        if mask_layer.crs() != raster_layer.crs:
+            mask_path_reprojected = self.reproject_layer(
+                mask_layer.source(), raster_layer.crs(), is_raster=False
+            )
+            if mask_path_reprojected and os.path.exists(mask_path_reprojected):
+                mask_layer = QgsVectorLayer(
+                    mask_path_reprojected, "mask_layer_reprojected"
+                )
+
+        # If mask layer intersects the raster layer
+        if not mask_layer.extent().intersects(raster_layer.extent()):
+            self.log_message(
+                "Cancelling clipping raster, the mask layer extent"
+                " and the raster extent do not overlap."
+            )
+            self.cancel_task()
+            return False
+
+        mask_extent_area = mask_layer.extent().area()
+        raster_extent_area = raster_layer.extent().area()
+
+        area_ratio = mask_extent_area / raster_extent_area
+
+        # If mask layer extent is 15 % greater than raster layer extent
+        if abs(area_ratio - 1) < 0.15:
+            self.log_message(
+                "Skipping clipping raster layer, "
+                "the mask layer extent is within 15 percent of the raster layer extent"
+            )
+            return False
+
+        return True
+
     def clip_raster_by_mask(self, 
         input_raster_path: str,
         mask_layer_path: str,
@@ -968,6 +1032,12 @@ class ScenarioAnalysisTask(QgsTask):
                         f"the study area layer\n"
                     )
 
+                    if not self._can_clip_raster_by_mask(pathway_layer, aoi_layer):
+                        continue
+
+                    if self.processing_cancelled:
+                        return False
+
                     output_file = os.path.join(
                         clipped_pathways_directory,
                         f"{Path(pathway.path).stem}_{str(self.scenario.uuid)[:4]}.tif",
@@ -1018,6 +1088,12 @@ class ScenarioAnalysisTask(QgsTask):
                                     f"skipping clipping the layer."
                                 )
                                 continue
+
+                            if not self._can_clip_raster_by_mask(layer, aoi_layer):
+                                continue
+
+                            if self.processing_cancelled:
+                                return False
 
                             self.log_message(
                                 f"Clipping the {priority_layer.get('name')} priority layer "
