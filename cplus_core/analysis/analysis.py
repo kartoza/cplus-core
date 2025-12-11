@@ -1129,6 +1129,74 @@ class ScenarioAnalysisTask(QgsTask):
 
         return True
 
+    def run_normalize_pathways_carbon_impact(
+        self,
+        pathways: typing.List[NcsPathway]
+    ) -> bool:
+        """Normalizes the total carbon impact for the pathways grouped by the pathway type
+
+        :param pathways: List of the pathways
+        :type pathways: typing.List[NcsPathway]
+
+        :returns: True if the task operation was successfully completed else False.
+        :rtype: bool
+        """
+        if self.processing_cancelled:
+            return False
+
+        self.log_message(tr(f"Normalizing Total Carbon Impact for Pathways"))
+
+        if len(pathways) == 0:
+            msg = tr(f"No defined pathways for running normalize total carbon impact.")
+            self.set_info_message(
+                msg,
+                level=Qgis.Critical,
+            )
+            self.log_message(msg)
+            return False
+
+        try:
+            # Group the manage and protect pathways and collect carbon impact values
+            pathways_carbon_value = [
+                p.type_options.get("carbon_impact", 0) for p in pathways if p.pathway_type in (NcsPathwayType.MANAGE,  NcsPathwayType.RESTORE)
+            ]
+            pathways_carbon_value = [v for v in pathways_carbon_value if v is not None]
+
+            # Calculate min/max for each pathway type
+
+            carbon_stats = {}
+            if len(pathways_carbon_value) > 0:
+                carbon_stats = {
+                    "min": min(pathways_carbon_value),
+                    "max": max(pathways_carbon_value),
+                    "range": max(pathways_carbon_value) - min(pathways_carbon_value),
+                }                    
+            
+            # Normalize carbon impact for each pathway
+            for pathway in pathways:   
+                # Ignore protect pathways             
+                if pathway.pathway_type not in (NcsPathwayType.MANAGE,  NcsPathwayType.RESTORE):
+                    continue
+                
+                carbon_impact = pathway.type_options.get("carbon_impact")
+                if carbon_impact is None:
+                    continue
+                
+                if carbon_stats["range"] == 0:
+                    # All values are the same carbon impact
+                    norm_carbon_impact = 1 / len(pathways_carbon_value)
+                else:
+                    norm_carbon_impact = (carbon_impact - carbon_stats["min"]) / carbon_stats["range"]
+                
+                pathway.type_options.update({"norm_carbon_impact": norm_carbon_impact})
+                    
+            return True
+        except Exception as e:
+            self.log_message(f"Problem normalizing pathways carbon impact, {e}\n")
+            self.log_message(traceback.format_exc())
+            self.cancel_task(e)            
+            return False
+        
     def run_pathways_weighting(
         self,
         priority_layers_groups: dict,
@@ -1169,16 +1237,16 @@ class ScenarioAnalysisTask(QgsTask):
             self.log_message(msg)
             return False
 
-        # Get relative impact matrix items
-        pathway_uuids = self.relative_impact_matrix.get("pathway_uuids", [])
-        priority_layer_uuids = self.relative_impact_matrix.get("priority_layer_uuids", [])
-        relative_impact_values = self.relative_impact_matrix.get("values", [])
-        
-        # Get valid pathways
-        pathways: typing.List[NcsPathway] = []
-        activities_paths = []
-
         try:
+            # Get relative impact matrix items
+            pathway_uuids = self.relative_impact_matrix.get("pathway_uuids", [])
+            priority_layer_uuids = self.relative_impact_matrix.get("priority_layer_uuids", [])
+            relative_impact_values = self.relative_impact_matrix.get("values", [])
+            
+            # Get valid pathways
+            pathways: typing.List[NcsPathway] = []
+            activities_paths = []
+
             # Validate activities and corresponding pathways
             for activity in self.analysis_activities:
                 if not activity.pathways and (
@@ -1207,6 +1275,8 @@ class ScenarioAnalysisTask(QgsTask):
             if not pathways and len(activities_paths) > 0:
                 self.run_activities_analysis(self.analysis_activities, extent)
                 return False
+
+            self.run_normalize_pathways_carbon_impact(pathways)
 
             suitability_index = float(
                 self.get_settings_value(
@@ -1298,8 +1368,8 @@ class ScenarioAnalysisTask(QgsTask):
                                         )
                                         impact_value = None
 
-                                value = group.get("value")
-                                priority_group_coefficient = float(value)
+                                user_weight = group.get("value")
+                                priority_group_coefficient = float(user_weight)
                                 if priority_group_coefficient > 0:
                                     if pwl not in layers:
                                         layers.append(pwl)
@@ -1309,17 +1379,22 @@ class ScenarioAnalysisTask(QgsTask):
                                         f'"{pwl_path_basename}@1")'
                                     )
 
-                                    if impact_value is not None:                                        
-                                        pwl_expression = (
-                                            f'({priority_group_coefficient * int(impact_value)}*'
-                                            f'"{pwl_path_basename}@1")'
-                                        )
+                                    if impact_value is not None and impact_value < 0:  
                                         # Inverse the PWL
-                                        if impact_value < 0:
-                                            pwl_expression = (
-                                                f'({priority_group_coefficient * abs(int(impact_value))}*'
-                                                f'("{pwl_path_basename}@1" - 1) * -1)'
+                                        pwl_expression = (
+                                            f'({priority_group_coefficient}*'
+                                            f'("{pwl_path_basename}@1" - 1) * -1)'
                                         )
+                                
+                                    norm_carbon_impact = pathway.type_options.get("norm_carbon_impact")
+                                    if layer.get("is_carbon") and norm_carbon_impact is not None:
+                                        # For restore and manage pathways, multiply by normalized carbon impact
+                                        pwl_expression += f' * {abs(int(impact_value)) * norm_carbon_impact}'
+                                    elif impact_value is not None:
+                                        # For non-carbon PWLS and and protect pathways,
+                                        #  multiply by impact weight from the matrix
+                                        pwl_expression += f'* {abs(int(impact_value))}'
+                                        
                                     base_names.append(pwl_expression)
                                     if not run_calculation:
                                         run_calculation = True
@@ -1377,8 +1452,8 @@ class ScenarioAnalysisTask(QgsTask):
 
         except Exception as e:
             self.log_message(f"Problem weighting pathways, {e}\n")
-            self.cancel_task(e)
             self.log_message(traceback.format_exc())
+            self.cancel_task(e)            
             return False
 
         return True
