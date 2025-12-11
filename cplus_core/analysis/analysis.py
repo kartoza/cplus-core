@@ -33,7 +33,7 @@ from ..utils.conf import Settings
 from ..definitions.defaults import (
     SCENARIO_OUTPUT_FILE_NAME, DEFAULT_VALUES
 )
-from ..models.base import ScenarioResult, Activity, NcsPathway
+from ..models.base import ScenarioResult, Activity, NcsPathway, NcsPathwayType
 from ..utils.helper import (
     align_rasters,
     clean_filename,
@@ -1729,7 +1729,8 @@ class ScenarioAnalysisTask(QgsTask):
             input_path: str,
             target_crs: QgsCoordinateReferenceSystem,
             output_directory: str = None,
-            target_extent: str = None
+            target_extent: str = None,
+            is_raster: bool = True
             ) -> str:
         
         """Reprojects the input layer to the target CRS and saves it in the
@@ -1742,6 +1743,8 @@ class ScenarioAnalysisTask(QgsTask):
         :type output_directory: str, optional
         :param target_extent: Target extent, defaults to None
         :type target_extent: str, optional
+        :param is_raster: Check if layer is raster, defaults to True
+        :type is_raster: bool, optional
         :returns: Path to the reprojected layer
         :rtype: str
         """
@@ -1755,9 +1758,10 @@ class ScenarioAnalysisTask(QgsTask):
         if output_directory is None:
             output_directory = Path(input_path).parent
         
+        ext = "tif" if is_raster else ".shp"
         output_file = os.path.join(
             output_directory,
-            f"{Path(input_path).stem}_{str(self.scenario.uuid)[:4]}.tif",
+            f"{Path(input_path).stem}_{str(self.scenario.uuid)[:4]}.{ext}",
         )
 
         alg_params = {
@@ -1781,7 +1785,7 @@ class ScenarioAnalysisTask(QgsTask):
             return None
 
         results = processing.run(
-            "gdal:warpreproject",
+            "gdal:warpreproject" if is_raster else "native:reprojectlayer",
             alg_params,
             context=self.processing_context,
             feedback=self.feedback,
