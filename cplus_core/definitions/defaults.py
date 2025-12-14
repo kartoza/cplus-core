@@ -15,7 +15,6 @@ class DEFAULT_VALUES(object):
     """Default values for analysis."""
 
     snapping_enabled = False
-    pathway_suitability_index = 0
     carbon_coefficient = 0.0
     snap_rescale = False
     snap_method = 0
