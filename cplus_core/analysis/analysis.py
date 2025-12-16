@@ -1279,13 +1279,6 @@ class ScenarioAnalysisTask(QgsTask):
 
             self.run_normalize_pathways_carbon_impact(pathways)
 
-            suitability_index = float(
-                self.get_settings_value(
-                    Settings.PATHWAY_SUITABILITY_INDEX,
-                    default=0
-                )
-            )
-
             settings_priority_layers = self.get_priority_layers()
 
             weighted_pathways_directory = os.path.join(
@@ -1304,9 +1297,9 @@ class ScenarioAnalysisTask(QgsTask):
 
                 # Include suitability index if not zero
                 pathway_basename = Path(pathway.path).stem
-                if suitability_index > 0:
+                if pathway.suitability_index > 0:
                     base_names.append(
-                        f'({suitability_index}*"{pathway_basename}@1")'
+                        f'({pathway.suitability_index}*"{pathway_basename}@1")'
                     )
                     run_calculation = True
                 else:

@@ -25,7 +25,6 @@ class TaskConfig(object):
     snap_layer = ""
     snap_rescale: bool = DEFAULT_VALUES.snap_rescale
     snap_method = DEFAULT_VALUES.snap_method
-    pathway_suitability_index = DEFAULT_VALUES.pathway_suitability_index
     carbon_coefficient = DEFAULT_VALUES.carbon_coefficient
     sieve_enabled = DEFAULT_VALUES.sieve_enabled
     sieve_threshold = DEFAULT_VALUES.sieve_threshold
@@ -58,7 +57,6 @@ class TaskConfig(object):
         mask_layers_paths="",
         snap_rescale: bool = DEFAULT_VALUES.snap_rescale,
         snap_method=DEFAULT_VALUES.snap_method,
-        pathway_suitability_index=DEFAULT_VALUES.pathway_suitability_index,  # noqa
         carbon_coefficient=DEFAULT_VALUES.carbon_coefficient,
         sieve_enabled=DEFAULT_VALUES.sieve_enabled,
         sieve_threshold=DEFAULT_VALUES.sieve_threshold,
@@ -102,10 +100,6 @@ class TaskConfig(object):
         :param snap_method: Snap method,
             defaults to DEFAULT_VALUES.snap_method
         :type snap_method: int, optional
-
-        :param pathway_suitability_index: Pathway suitability index,
-            defaults to DEFAULT_VALUES.pathway_suitability_index
-        :type pathway_suitability_index: int, optional
 
         :param sieve_enabled: Enable sieve function,
             defaults to DEFAULT_VALUES.sieve_enabled
@@ -165,7 +159,6 @@ class TaskConfig(object):
         self.all_activities = all_activities
 
         self.snapping_enabled = snapping_enabled
-        self.pathway_suitability_index = pathway_suitability_index
         self.carbon_coefficient = carbon_coefficient
         self.snap_rescale = snap_rescale
         self.snap_method = snap_method
@@ -265,7 +258,6 @@ class TaskConfig(object):
             "snap_layer": self.snap_layer,
             "snap_rescale": self.snap_rescale,
             "snap_method": self.snap_method,
-            "pathway_suitability_index": self.pathway_suitability_index,
             "carbon_coefficient": self.carbon_coefficient,
             "sieve_enabled": self.sieve_enabled,
             "sieve_threshold": self.sieve_threshold,
@@ -308,7 +300,8 @@ class TaskConfig(object):
                         "layer_type": pathway.layer_type,
                         "priority_layers": pathway.priority_layers,
                         "type_options": pathway.type_options,
-                        "pathway_type": pathway.pathway_type
+                        "pathway_type": pathway.pathway_type,
+                        "suitability_index": pathway.suitability_index
                     }
                 )
             input_dict["activities"].append(activity_dict)
