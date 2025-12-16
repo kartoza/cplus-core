@@ -2768,17 +2768,17 @@ class ScenarioAnalysisTask(QgsTask):
     
     def reproject_mask_layer(
             self, 
-            input_path: str, 
-            output_directory: str, 
-            target_crs: QgsCoordinateReferenceSystem
+            input_path: str,            
+            target_crs: QgsCoordinateReferenceSystem,
+            output_directory: str= None
         ):
         """Reprojects the input layer to the target CRS and saves it to the output path.
         :param input_path: Input layer path
-        :type input_path: str
-        :param output_directory: Output directory path
-        :type output_directory: str
+        :type input_path: str        
         :param target_crs: Target CRS to reproject to
         :type target_crs: QgsCoordinateReferenceSystem
+        :param output_directory: Output directory path default to None
+        :type output_directory: str
         :returns: Reprojected layer path
         :rtype: str
         """
