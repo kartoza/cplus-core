@@ -2067,6 +2067,61 @@ class ScenarioAnalysisTask(QgsTask):
                     if not (pathway in pathways):
                         pathways.append(pathway)
 
+            # Replace the no data value for priority layers
+            # Dict with PWL uuid as key and path as value
+            priority_layers_paths = {}
+            for priority_layer in self.get_priority_layers():
+                if priority_layer is None:
+                    continue
+
+                if self.processing_cancelled:
+                    return False
+
+                priority_layer_path = priority_layer.get("path")
+
+                if not Path(priority_layer_path).exists():                    
+                    continue
+
+                priority_layers_paths[priority_layer.get("uuid")] = priority_layer_path
+
+                layer = QgsRasterLayer(
+                    priority_layer_path, f"{str(uuid.uuid4())[:4]}"
+                )
+                if not layer.isValid():
+                    self.log_message(
+                        f"Priority layer {priority_layer.get('name')} is not valid, "
+                        f"skipping replacing nodata value for layer."
+                    )
+                    continue
+
+                raster_provider = layer.dataProvider()
+                raster_no_data_value = raster_provider.sourceNoDataValue(1)
+                
+                if raster_no_data_value == nodata_value:
+                    self.log_message(
+                        f"Priority layer {priority_layer.get('name')} already has the nodata value "
+                        f"{nodata_value}, skipping replacing nodata value for layer."
+                    )
+                    continue
+                
+                self.log_message(
+                    f"Replacing nodata value for {priority_layer.get('name')} priority layer "
+                    f"to {nodata_value}\n"
+                )
+
+                output_file = os.path.join(
+                    replaced_nodata_priority_directory,
+                    f"{Path(pathway.path).stem}_{str(self.scenario.uuid)[:4]}.tif",
+                )
+
+                result = self.replace_nodata(
+                    priority_layer_path,
+                    output_file,
+                    nodata_value
+                )
+                if result:
+                    priority_layers_paths[priority_layer.get("uuid")] = output_file
+
             if pathways is not None and len(pathways) > 0:
                 for pathway in pathways:
                     pathway_layer = QgsRasterLayer(pathway.path, pathway.name)
@@ -2105,72 +2160,19 @@ class ScenarioAnalysisTask(QgsTask):
                         if result:
                             pathway.path = output_file
 
-                    self.log_message(
-                        f"Replacing nodata value for {len(pathway.priority_layers)} "
-                        f"priority weighting layers from pathway {pathway.name}\n"
-                    )
-
                     if (
                         pathway.priority_layers is not None
                         and len(pathway.priority_layers) > 0
                     ):
-                        priority_layers = []
+                        pathway_priority_layers = []
                         for priority_layer in pathway.priority_layers:
-                            if priority_layer is None:
-                                continue
+                            pwl_uuid = priority_layer.get("uuid")
+                            if pwl_uuid in priority_layers_paths:
+                                priority_layer["path"] = priority_layers_paths.get(pwl_uuid, "")
 
-                            priority_layer_settings = self.get_priority_layer(
-                                priority_layer.get("uuid")
-                            )
-                            if priority_layer_settings is None:
-                                continue
+                            pathway_priority_layers.append(priority_layer)
 
-                            priority_layer_path = priority_layer_settings.get("path")
-
-                            if not Path(priority_layer_path).exists():
-                                priority_layers.append(priority_layer)
-                                continue
-
-                            layer = QgsRasterLayer(
-                                priority_layer_path, f"{str(uuid.uuid4())[:4]}"
-                            )
-                            if not layer.isValid():
-                                self.log_message(
-                                    f"Priority layer {priority_layer.get('name')} "
-                                    f"from pathway {pathway.name} is not valid, "
-                                    f"skipping replacing nodata value for layer."
-                                )
-                                continue
-
-                            raster_provider = layer.dataProvider()
-                            raster_no_data_value = raster_provider.sourceNoDataValue(1)
-                            if raster_no_data_value == nodata_value:
-                                self.log_message(
-                                    f"Priority layer {priority_layer.get('name')} already has the nodata value "
-                                    f"{nodata_value}, skipping replacing nodata value for layer."
-                                )
-                            else:
-                                self.log_message(
-                                    f"Replacing nodata value for {priority_layer.get('name')} priority layer "
-                                    f"to {nodata_value}\n"
-                                )
-
-                                output_file = os.path.join(
-                                    replaced_nodata_priority_directory,
-                                    f"{Path(pathway.path).stem}_{str(self.scenario.uuid)[:4]}.tif",
-                                )
-
-                                result = self.replace_nodata(
-                                    priority_layer_path,
-                                    output_file,
-                                    nodata_value
-                                )
-                                if result:
-                                    priority_layer["path"] = output_file
-
-                            priority_layers.append(priority_layer)
-
-                        pathway.priority_layers = priority_layers
+                        pathway.priority_layers = pathway_priority_layers
 
         except Exception as e:
             self.log_message(f"Problem replacing nodata value for layers, {e} \n")
