@@ -1749,14 +1749,13 @@ class ScenarioAnalysisTask(QgsTask):
             )
             return None
         
-        if output_directory is None:
-            output_directory = Path(input_path).parent
-        
-        ext = "tif" if is_raster else ".shp"
-        output_file = os.path.join(
-            output_directory,
-            f"{Path(input_path).stem}_{str(self.scenario.uuid)[:4]}.{ext}",
-        )
+        output_file = "TEMPORARY_OUTPUT"
+        if output_directory:       
+            ext = "tif" if is_raster else "shp"
+            output_file = os.path.join(
+                output_directory,
+                f"{Path(input_path).stem}_{str(self.scenario.uuid)[:4]}.{ext}",
+            )
 
         alg_params = {
             "INPUT": input_path,
