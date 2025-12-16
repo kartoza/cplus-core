@@ -1089,6 +1089,52 @@ class ScenarioAnalysisTask(QgsTask):
                     if not (pathway in pathways):
                         pathways.append(pathway)
 
+             # Reproject priority layers
+            
+            # Clipping the PWLs
+            # Dict with PWL uuid as key and path as value
+            priority_layers_paths = {}
+            for priority_layer in self.get_priority_layers():
+                if priority_layer is None:
+                    continue
+
+                if self.processing_cancelled:
+                    return False
+
+                priority_layer_path = priority_layer.get("path")
+
+                if not Path(priority_layer_path).exists():
+                    continue
+
+                priority_layers_paths[priority_layer.get("uuid")] = priority_layer_path
+
+                layer = QgsRasterLayer(priority_layer_path, f"{str(uuid.uuid4())[:4]}")
+                if not layer.isValid():
+                    self.log_message(
+                        f"Priority layer {priority_layer.get('name')} is not valid, "
+                        f"skipping clipping layer."
+                    )
+                    continue
+                
+                if not self._can_clip_raster_by_mask(layer, mask_layer):
+                    continue
+
+                self.log_message(
+                    f"Clipping the {priority_layer.get('name')} priority layer "
+                    f"by study area layer\n"
+                )
+
+                output_file = os.path.join(
+                    clipped_priority_directory,
+                    f"{Path(pathway.path).stem}_{str(self.scenario.uuid)[:4]}.tif",
+                )
+
+                result = self.clip_raster_by_mask(
+                    priority_layer_path, studyarea_path, output_file
+                )
+                if result:
+                    priority_layers_paths[priority_layer.get("uuid")] = output_file
+
             if pathways is not None and len(pathways) > 0:                
                 for pathway in pathways:
                     pathway_layer = QgsRasterLayer(pathway.path, pathway.name)
@@ -1123,71 +1169,21 @@ class ScenarioAnalysisTask(QgsTask):
                     if result:
                         pathway.path = output_file
 
-                    self.log_message(
-                        f"Clipping the {pathway.name} pathway's {len(pathway.priority_layers)} "
-                        f"priority weighting layers by study area\n"
-                    )
-
                     if (
                         pathway.priority_layers is not None
                         and len(pathway.priority_layers) > 0
                     ):
-                        priority_layers = []
+                        pathway_priority_layers = []
                         for priority_layer in pathway.priority_layers:
-                            if priority_layer is None:
-                                continue
-
-                            if self.processing_cancelled:
-                                return False
-
-                            priority_layer_settings = self.get_priority_layer(
-                                priority_layer.get("uuid")
-                            )
-                            if priority_layer_settings is None:
-                                continue
-
-                            priority_layer_path = priority_layer_settings.get("path")
-
-                            if not Path(priority_layer_path).exists():
-                                priority_layers.append(priority_layer)
-                                continue
-
-                            layer = QgsRasterLayer(
-                                priority_layer_path, f"{str(uuid.uuid4())[:4]}"
-                            )
-                            if not layer.isValid():
-                                self.log_message(
-                                    f"Priority layer {priority_layer.get('name')} "
-                                    f"from pathway {pathway.name} is not valid, "
-                                    f"skipping clipping the layer."
+                            pwl_uuid = priority_layer.get("uuid")
+                            if pwl_uuid in priority_layers_paths:
+                                priority_layer["path"] = priority_layers_paths.get(
+                                    pwl_uuid, ""
                                 )
-                                continue
 
-                            if not self._can_clip_raster_by_mask(layer, mask_layer):
-                                continue
+                            pathway_priority_layers.append(priority_layer)
 
-                            if self.processing_cancelled:
-                                return False
-
-                            self.log_message(
-                                f"Clipping the {priority_layer.get('name')} priority layer "
-                                f"by study area layer\n"
-                            )
-
-                            output_file = os.path.join(
-                                clipped_priority_directory,
-                                f"{Path(pathway.path).stem}_{str(self.scenario.uuid)[:4]}.tif",
-                            )
-
-                            result = self.clip_raster_by_mask(
-                                priority_layer_path, studyarea_path, output_file
-                            )
-                            if result:
-                                priority_layer["path"] = output_file
-
-                            priority_layers.append(priority_layer)
-
-                        pathway.priority_layers = priority_layers
+                        pathway.priority_layers = pathway_priority_layers
 
         except Exception as e:
             self.log_message(f"Problem clipping the layers, {e} \n")
@@ -1991,11 +1987,6 @@ class ScenarioAnalysisTask(QgsTask):
                         )
                         if output_path:
                             pathway.path = output_path
-
-                    self.log_message(
-                        f"Reprojecting {len(pathway.priority_layers)} "
-                        f"priority weighting layers from pathway {pathway.name}\n"
-                    )
 
                     if (
                         pathway.priority_layers is not None
