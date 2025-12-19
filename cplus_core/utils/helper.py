@@ -354,7 +354,7 @@ def normalize_raster(
                 f"Layer cannot be normalized, min value {min_value} is greater than max value {max_value}"
             )
         
-        if min_value >= 0 and max_value <= 1:
+        if min_value == 0 and max_value == 1:
             return True, f"Layer {input_raster_path} is already normalized (min={min_value}, max={max_value})"
 
         expression = f"(A - {min_value}) / ({max_value} - {min_value})"
